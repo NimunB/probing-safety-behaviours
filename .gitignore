@@ -1,0 +1,24 @@
+# Activation cache — large (GBs), recomputable, and CONTENT-BLIND (keyed on dataset name +
+# example count, not content). Never commit: a stale cache that looks valid is worse than none.
+activation_cache/
+
+# Fallback clone of ApolloResearch/deception-detection (535 MB). Only appears if the vendored
+# files under data/ are missing — data/ is the intended source. See data/PROVENANCE.md.
+deception-detection/
+
+# Secrets: HF_TOKEN (gated Llama repo) and ANTHROPIC_API_KEY (judge).
+.env
+*.env
+
+# --- NOT ignored, deliberately -----------------------------------------------------------
+# data/            ~500 KB of vendored Apollo files; frozen inputs, must be versioned.
+# exported_probes/ ~0.5 MB per behaviour; the only GPU-expensive artefact that is not
+#                  reproducible from the repo alone. Commit these.
+
+__pycache__/
+*.py[cod]
+.ipynb_checkpoints/
+.venv/
+venv/
+*.egg-info/
+.pytest_cache/

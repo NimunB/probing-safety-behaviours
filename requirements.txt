@@ -1,0 +1,63 @@
+# Pinned from the working environment on the Vast.ai RTX 3090 box (/venv/arena-env),
+# 2026-07-20. These are the versions the audited results were produced with.
+#
+# TORCH: installed as 2.11.0+cu128 (CUDA 12.8 build). The plain PyPI wheel will NOT carry the
+# +cu128 local version. Install torch first, from the CUDA index, then the rest:
+#
+#     uv pip install torch==2.11.0 --index-url https://download.pytorch.org/whl/cu128
+#     uv pip install -r requirements.txt
+#
+# On a Blackwell GPU (RTX 50-series, B200) cu128 or newer is REQUIRED — an older build installs
+# cleanly but has no kernels for the arch and dies at the first GPU op.
+
+torch==2.11.0
+transformers==4.57.6
+accelerate==1.14.0
+bitsandbytes==0.49.2          # 8-bit quantization; Llama-3.1-8B in 8-bit fits a 24 GB card
+
+# --- probing / metrics -------------------------------------------------------------------
+scikit-learn==1.9.0           # LogisticRegression, StandardScaler, roc_auc_score, roc_curve
+numpy==1.26.4
+pandas==2.0.3
+einops==0.7.0                 # attention-probe forward pass
+jaxtyping==0.2.38             # shape annotations
+
+# --- data --------------------------------------------------------------------------------
+datasets==3.6.0               # HuggingFace: Arrrlex/models-under-pressure (high-stakes)
+PyYAML==6.0.3                 # Apollo roleplaying/dataset.yaml
+python-dotenv==1.2.2          # HF_TOKEN / ANTHROPIC_API_KEY from .env
+
+# --- LLM judge ---------------------------------------------------------------------------
+anthropic==0.116.0            # Claude Haiku judge; cells skip cleanly if ANTHROPIC_API_KEY is unset
+
+# --- UI (ui_probe.py) --------------------------------------------------------------------
+# These are preinstalled in the source /venv/arena-env but NOT on a fresh instance — the UI
+# will not start without them. (We chose FastAPI over Gradio to avoid a huggingface_hub
+# conflict with transformers; see README / plan M9.)
+fastapi==0.139.0
+uvicorn==0.51.0
+
+# --- notebooks / figures -----------------------------------------------------------------
+matplotlib==3.11.0            # static figures that render on GitHub (viz.py); seaborn look via
+                              # the built-in seaborn-v0_8-darkgrid style — no seaborn install needed
+plotly==6.8.0                 # remaining interactive figures not yet converted to matplotlib
+ipython==9.15.0               # IPython.display (HTML/display) in the viz + chat helpers
+ipykernel==7.3.0
+nbformat==5.10.4              # only needed to (re)generate the driver notebooks
+tqdm==4.68.4
+
+# viz.py renders token/attention heatmaps via circuitsvis (vendored from ARENA's
+# visualize_token_scores). REQUIRED for the heatmap cells. The version installed in the source
+# /venv/arena-env reports 0.0.0 (a dev/editable install) so it can't be pinned from here — install
+# a real release (e.g. circuitsvis==1.43.3) on a fresh instance and confirm the heatmaps render.
+circuitsvis
+
+# --- OPTIONAL -----------------------------------------------------------------------------
+# scipy: only the judge-VALIDATION step (Spearman agreement between your blind labels and the
+# judge) needs it. That step is a manual cell in the original notebook and is NOT in the three
+# driver notebooks, so scipy is not required for the parity run. Install if you run validation.
+# scipy==1.17.1
+#
+# kaleido: Plotly figures are stored as application/vnd.plotly.v1+json, which GitHub cannot
+# render. kaleido lets fig.to_image(format="png") produce a static fallback. See README.
+# kaleido
