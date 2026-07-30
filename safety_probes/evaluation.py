@@ -22,9 +22,11 @@ def steering_nie_llm_evaluation(spec, dirs, prompt_texts, readout_texts, pos_rea
       2. judge - steer while GENERATING from `prompt_texts`; the LLM judge scores each generation
                  for the behaviour AND coherence (the guard against "steering that works by breaking
                  the model"). No ANTHROPIC_API_KEY -> judge intentionally skipped, columns NaN,
-                 NIE still fills. But when the judge IS configured it must not fail quietly: a point
-                 scored on fewer than the requested generations prints a visible shortfall warning,
-                 and a point that scores 0/N raises (systematic breakage -> stop loudly, no empty panels).
+                 NIE still fills. Passing `prompt_texts=[]` also skips the judge deliberately —
+                 for NIE-only eval sets (deception ID, plan #46). But when the judge IS configured
+                 and prompts were given it must not fail quietly: a point scored on fewer than the
+                 requested generations prints a visible shortfall warning, and a point that scores
+                 0/N raises (systematic breakage -> stop loudly, no empty panels).
     Returns {method: {coef, nie, judge_beh, judge_coh}} - feed to plot_steering_effects."""
     results = {m: {"coef": [], "nie": [], "judge_beh": [], "judge_coh": []} for m in dirs}
     # Control measurement on THESE eval texts (a control belongs to the data it was measured on).
@@ -40,7 +42,7 @@ def steering_nie_llm_evaluation(spec, dirs, prompt_texts, readout_texts, pos_rea
             if j:
                 beh.append(j["behaviour"]); coh.append(j["coherence"])
         n_ok, n_req = len(beh), len(prompt_texts)
-        if judge_on:  # only police failures when the judge is actually expected to work
+        if judge_on and n_req:  # only police failures when judging was actually requested (#46)
             if n_ok == 0:
                 raise RuntimeError(
                     f"Judge scored 0/{n_req} generations at {label}: systematic failure (bad model/key/"

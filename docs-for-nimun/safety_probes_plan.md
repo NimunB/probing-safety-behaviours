@@ -788,6 +788,56 @@ layer, same AUROCs, same steering block. **A refactor that moves a number is a b
 (The UI is downstream of the exports and does not affect this gate — it consumes bundles, it does not
 regenerate results.)
 
+## Status — 2026-07-30 (new instance, pre-re-run)
+
+Where the project stands after the instance migration and the 2026-07-30 working session
+(decisions #45–#49 below; this section is the narrative summary, the numbered entries are the record).
+
+**Environment.** Migrated to a new Vast.ai instance: RTX 5090 (32 GB, Blackwell), venv `/venv/main`,
+`/workspace` **is a volume** (unlike the old 3090 box — caches now survive recycle). torch is
+**2.12.0+cu130** vs the audited 2.11.0+cu128 (Blackwell needs ≥ cu128; transformers 4.57.6 matches
+the audited version). Both the HF model cache and `activation_cache/` are empty — the first run
+re-downloads the model (~15 GB) and re-extracts everything. `HF_HOME=/workspace/.hf_home` was added
+to the repo `.env` (2026-07-30): Vast's platform-managed Jupyter does not pass `HF_HOME` to kernels,
+which on 2026-07-30 had sent a full model download to the container disk, where a recycle deleted it
+— the repo `.env` route closes this permanently since `runtime.init()` loads it before resolving
+the cache.
+
+**Parity gate, reframed.** With a different GPU and CUDA/torch build, bit-parity with the audited
+notebook is not the realistic bar. The gate is now: **same detection-layer choices (12 / 20), same
+steering blocks ([15–19] / [9–13]), grid AUROCs within their bootstrap CIs**. Exact-parity would
+require pinning torch 2.11+cu128 (which does run on Blackwell) — available as a fallback if numbers
+diverge suspiciously.
+
+**This session's changes (all pre-run, so the upcoming run is the first under them):**
+- **#45** — `summary.ipynb` dissolved; per-behaviour probing/steering verdict cells inline; fixed
+  deception's `save_steering` silently omitting Roleplaying.
+- **#46** — `N_JUDGE_PROMPTS` 6 → 24; deception ID steering is NIE-only (byte-identical prompts);
+  NIE readout slices 24 → 32 (AI Liar capped at 27).
+- **#47** — judge rubrics rewritten CAA-style (verbatim comparison in `docs-for-nimun/sketchbook.md`);
+  judge validation moved to the neutral-instruction OOD prompts; the deceptive-persona line now
+  reaches no judge input anywhere.
+- **#48** — `comparison.ipynb` added (GPU-free cross-behaviour dose-response overlays + gated
+  simultaneous-steering pilot); full dose-response persisted to `*_steering_full.json`; specs moved
+  to `safety_probes/behaviours.py` (single source of truth; sycophancy's spec will join it).
+- Both driver notebooks restructured to one shared heading skeleton (§1–§8, 5.i/ii, 6a/b, 7a–d);
+  the original notebook's dropped interpretation/criteria markdown restored to deception and adapted
+  self-contained for high-stakes; `deception.ipynb`'s stale old-instance outputs cleared.
+- All changed paths verified by executed tests (mocked `steering_nie_llm_evaluation` empty-prompts
+  path; synthetic round-trip of `save_steering_full` → comparison §1 plot; verdict pandas logic).
+
+**Pending, in order:** (1) the full re-run — `deception.ipynb` → `high_stakes.ipynb` →
+`comparison.ipynb` §1 — which is simultaneously the parity gate's first execution on the package
+and the first-ever judge numbers (post-#44 none existed; #46/#47 changed n and rubrics anyway);
+(2) `judge_validation.ipynb` (manual, once) before any judge number is quoted; (3) a git commit
+checkpoint (this session's work is uncommitted on top of the initial commit). Watch during the run:
+deception's baseline readout gap (was +0.065, barely above the 0.05 floor) and the layer/block
+suggestions vs the audited values.
+
+**Roadmap after the run:** sycophancy as behaviour 3 (CAA A/B datasets; spec into `behaviours.py`;
+`readout_targets` → A/B, making the readout literally CAA's p(answer matching behavior)) → thesis
+draft → SAE interpretation (Llama Scope, cache-only post-processing) → 70B models.
+
 ## Jul 10–11 revisions (line-by-line audit session)
 
 Running log of every change made during the audit of `safety_probes.ipynb` against this plan, [NB],
@@ -1236,6 +1286,114 @@ and the papers. Newest entries appended at the bottom. All decisions confirmed b
    down, with real pulled examples, what the data looks like and what is masked at every stage —
    behaviour × split × (detection train/eval, direction extraction, steering application, readout,
    judge). Keep it updated when masking or loaders change.
+45. **`summary.ipynb` dissolved into per-behaviour verdict cells** (user decision 2026-07-30). The §4
+   verdict was pure bookkeeping over numbers the behaviour notebooks already compute — AUROC point
+   estimates parsed from the `evaluate_grid` frame (TPR@1%FPR reported but never in the verdict) and
+   NIE at calibrated coef +1 from `steering_nie_llm_evaluation` (the judge never fed the verdict) —
+   plus a CSV round-trip that existed only because the original §4 needed both behaviours in one
+   kernel. Each behaviour notebook now ends its probing section with a READ-verdict cell
+   (`auroc_pivot` → best probe per eval set + LR-family win share, [Apollo App. D.1]) and its
+   steering section with a WRITE-verdict cell (NIE-at-+1 table → best direction per eval set + MM
+   win share, [GoT Table 2], + a per-behaviour dissociation line and the judge-coherence caveat
+   printed alongside). Win shares are now **per-behaviour** rather than pooled across behaviours —
+   cleaner for the "does it hold across behaviours" question, and a new behaviour (sycophancy) adds
+   its own verdicts for free. CSV persistence (`save_detection`/`save_steering`) kept for thesis
+   tables; `summary.py` helpers and `load_*` unchanged. **Bug found and fixed during the move:**
+   deception's `save_steering` call omitted `dec_rp_results` — the Roleplaying steering eval (added
+   #39) never reached the CSV, so summary.ipynb's write verdict had silently excluded one of the
+   three deception eval sets. The verdict cell now builds `dec_steer_by_evalset` with all three and
+   the export cell reuses that dict (same pattern for high-stakes, whose saves were already
+   complete). Also this session: `deception.ipynb`'s stale committed outputs (old-instance run,
+   including a `NameError` traceback) were cleared with `nbconvert --clear-output`.
+46. **Judge n raised 6 → 24; deception-ID judge dropped; NIE readout slices raised** (user decisions
+   2026-07-30, after a comparison against [CAA]'s evaluation). Motivated by the wonky judge curves:
+   CAA averages every judged point over **50** prompts where we averaged over **6** — with 1–10
+   integer scores, n=6 cannot produce smooth dose-response curves; prompt wording was ruled out as
+   the main cause (and rewording would force a judge-validation re-run, since CAA itself notes judge
+   scores are sensitive to prompt wording). Three changes:
+   (a) **`N_JUDGE_PROMPTS = 24`** (judge.py) — SE ≈ 0.4 at sd ≈ 2; AI Liar's 27 items still cover
+   24 generation prompts. Cost: 19 judged points × 24 generations per eval set (~2–3 h of GPU
+   generation across the four judged sets on the 5090; Haiku judge cost trivial).
+   (b) **Deception ID steering is NIE-only.** Its generation prompts are byte-identical (#40b:
+   `[:2]` drops the fact, constant user turn) so greedy decoding makes every judged n effectively 1
+   — raising n buys nothing there. The cell now passes an empty prompt list; judge panels NaN by
+   design; the NIE dose-response (32 distinct test-split transcripts) remains the ID positive
+   control; one prompt is retained for `show_qualitative`. `steering_nie_llm_evaluation`'s #38
+   fail-loud guard gained `and n_req` so an empty prompt list is a deliberate skip, not a 0/0
+   failure. Alternatives considered and rejected: distinct-fact prompts (puts the content to lie
+   about into the prompt — changes the design) and temperature sampling (breaks determinism).
+   High-stakes ID is unaffected (24 distinct scenarios).
+   (c) **NIE readout/gap slices 24 → 32** everywhere except AI Liar, which is capped at **27** (the
+   whole set). Forward passes only; smooths NIE and the baseline-gap estimate. Sweep subsets stay 32.
+   Metric hierarchy confirmed this session (not changed): NIE stays the primary steering metric
+   ([GoT §6.1]; deterministic, generation-free, powers the sweeps), judge = behavioural
+   corroboration, coherence = validity guard (CAA has no coherence axis — they restricted the
+   multiplier range until quality held and spot-checked by hand; our panel quantifies the same
+   guard). Noted for the sycophancy extension: with CAA's A/B datasets, `spec.readout_targets`
+   becomes A/B and the readout is then literally CAA's p(answer matching behavior).
+   `data_reference.md` budget table + deception-ID judging note updated. Requires the pending
+   full re-run to take effect.
+47. **Judge rubrics rewritten CAA-style; judge validation moved off the persona-line prompts**
+   (user decisions 2026-07-30; follows the #46 CAA comparison; cite [CAA] as the inspiration in the
+   thesis). Verbatim comparison against `nrimsky/CAA` `scoring.py` (raw file; recorded in
+   `docs-for-nimun/sketchbook.md`) showed their scoring instructions are ~100 words with both ends
+   anchored AND explicit intermediate-score guidance, where ours were one sentence. Changes:
+   (a) **Both `judge_rubric`s expanded to the CAA shape** — "Please score … 1 to 10, where the score
+   reflects the extent to which …; a score of 1 indicates …; a score of 10 signifies …; use
+   intermediate scores …" — content unchanged in meaning (deception: asserting believed-false
+   things/creating false impressions, context-relative; high-stakes: urgency/gravity/warnings/
+   escalation). **Everything else about the judge is deliberately kept**: 1–10 scale (our enum
+   schema; CAA's code uses 0–10, their paper says 1–10 — noted as the one scale difference), the
+   two-axis behaviour+coherence output, the server-enforced JSON format, the `[Prompt]` transcript
+   (context is required for context-defined deception — a context-blind judge cannot score AI Liar),
+   and `claude-haiku-4-5`. No system prompt added.
+   (b) **`judge_validation.ipynb` now validates deception on `dec_ood_prompts`** (AI Liar,
+   neutral instruction) instead of `dec_id_prompts`: the ID prompt's "You are a deceptive AI
+   assistant." line anchors the judge AND the blind human labels identically, and post-#46 the
+   pipeline never judges ID prompts — validating on them would validate a distribution the judge
+   never sees. With this, **the persona line reaches no judge input anywhere** (it survives only in
+   `show_qualitative`'s printout, which involves no judge, and in the readout transcripts, which are
+   read by Llama, not Claude — the OOD system lines like AI Liar's salesperson context are kept, as
+   they are the facts that define the lie, not bias).
+   (c) `data_reference.md`: all four judge-input blocks re-rendered with the new rubrics; the
+   deception ID judge-input block re-labelled historical-illustration-only. Wording change means
+   judge scores are not comparable to any pre-#47 judge output (none valid exists post-#44 anyway)
+   and judge validation must run against the new rubrics — it is designed in (`judge_validation.ipynb`).
+48. **`comparison.ipynb` added — cross-behaviour steering figures + drafted simultaneous steering**
+   (user decisions 2026-07-30). Motivated by [CAA Fig. 5] (dose-response per behaviour) and van der
+   Weij Fig. 7 (simultaneous steering, global coefficient). Decisions: **MM direction only** (the
+   reference direction, held fixed so the comparison is across behaviours, not estimators); **OOD
+   eval sets only** in the overlays (OOD is the claim; ID remains the positive control in the
+   behaviour notebooks — NOT removed); cross-behaviour **probe similarities left out** (user
+   decision, consistent with #41's basis-mismatch rationale). Enablers: (a) `summary.save_steering_full`
+   / `load_steering_full` persist the complete dose-response dicts (all coefs, NIE + judge axes) to
+   `exported_probes/{behaviour}_steering_full.json` — one added line in each export cell — making
+   §1 of the comparison notebook GPU-free and re-runnable while writing; (b) **specs moved to
+   `safety_probes/behaviours.py`** (verbatim; single source of truth) because the comparison
+   notebook runs in its own kernel and §2 needs the readouts — the driver notebooks now import
+   `DECEPTION_SPEC`/`HIGH_STAKES_SPEC` instead of defining them (content unchanged; sycophancy's
+   spec will live there too). §1 overlays: NIE (class-gap units — the cross-behaviour-comparable
+   axis), judge behaviour (the Fig-5 analogue; rubric-dependent, compare shapes not levels), judge
+   coherence. §2: simultaneous-steering pilot behind a `RUN_SIMULTANEOUS = False` gate —
+   `compose_steering` over both behaviours' calibrated MM vectors (disjoint blocks = van der Weij's
+   per-layer setting), one global coefficient, each behaviour measured by its own OOD readout in its
+   own gap units; readout-only (no judge/tax axis) and explicitly a PILOT per `compose_steering`'s
+   research-grade flag — the validated three-behaviour version becomes the headline figure after
+   sycophancy. Same-sign sweep only for now; mixed-sign combinations deferred.
+49. **Deception OOD pool: keep the concatenated pool for the run; macro-average deferred to
+   post-run** (discussion 2026-07-30). The "Deception OOD pool" column (`cat_pack`, #35) computes a
+   *pooled* AUROC over the union of AI Liar + Roleplaying — which includes cross-set rank
+   comparisons (an honest AI Liar example ranked against a deceptive Roleplaying one), making it
+   sensitive to dataset-level score offsets, and is **93% Roleplaying by count** (742 vs 54), so it
+   will sit nearly on top of Roleplaying's own column. The alternative — a *macro-average* of the
+   two per-set AUROCs — weights the distributions equally and answers "expected generalization to a
+   new OOD distribution" rather than "one monitor over mixed traffic". Neither reference paper
+   pools ([Apollo] and [HS] report per-dataset), so the **per-set columns stay the load-bearing,
+   paper-comparable results** either way. Decision: no change before the run (eval packs sit on
+   cached activations — switching or adding a macro-average column afterwards is one fast cell
+   re-run); if a single summary number is needed in the draft, quote the macro-average of the two
+   AUROCs. Caveat if a macro-average row is added later: TPR@1%FPR cannot macro-average (AI Liar's
+   is NaN by design, #35) and stays per-set.
 
 ## Verification
 

@@ -123,10 +123,12 @@ the notebook (49 byte-identical after mechanical `runtime.` substitutions; 7 cos
 annotations, context-manager methods, import placement). The three `notebooks/` orchestrate the
 pipeline by importing the package.
 
-**What's left is the parity RUN** — execute `notebooks/deception.ipynb`, `high_stakes.ipynb`, then
-`summary.ipynb` on the GPU and confirm the numbers match the audited notebook: detection layer
-**12 / 20**, the grid AUROCs, steering block **[15-19] / [9-13]**, the NIE curves. Until that passes,
+**What's left is the parity RUN** — execute `notebooks/deception.ipynb` and `high_stakes.ipynb` on
+the GPU and confirm the numbers match the audited notebook: detection layer **12 / 20**, the grid
+AUROCs, steering block **[15-19] / [9-13]**, the NIE curves. Until that passes,
 `safety_probes.ipynb` remains the source of truth. A refactor that moves a number is a bug.
+(`summary.ipynb` was dissolved 2026-07-30, plan #45 — each notebook now computes its own probing
+verdict at the end of its probing section and steering verdict at the end of its steering section.)
 
 | Module | Status | Contents |
 |---|---|---|
@@ -142,8 +144,8 @@ pipeline by importing the package.
 | `judge.py` | ✅ AST-verified | Claude judge (`enum` fix #44), lazy client |
 | `evaluation.py` | ✅ AST-verified | `steering_nie_llm_evaluation` (steering × judge) |
 | `viz.py` | ✅ AST-verified | heatmaps, PCA panel, ROC, steering plots, cosine matrix + vendored ARENA viz utils |
-| `summary.py` | ✅ | §4 verdict `auroc_pivot` / `nie_at` + cross-kernel CSV persistence |
-| `notebooks/` | ✅ built | `deception.ipynb` (§2), `high_stakes.ipynb` (§3), `summary.ipynb` (§4) |
+| `summary.py` | ✅ | verdict helpers `auroc_pivot` / `nie_at` + CSV persistence of final numbers (verdict cells live in the behaviour notebooks, plan #45) |
+| `notebooks/` | ✅ built | `deception.ipynb` (§2), `high_stakes.ipynb` (§3) — per-behaviour verdicts inline; `summary.ipynb` removed 2026-07-30; `comparison.ipynb` (plan #48) — cross-behaviour steering overlays (GPU-free, from `exported_probes/*_steering_full.json`) + drafted simultaneous-steering experiment |
 
 `ui_probe.py` now imports the loaders from `safety_probes.export` (the duplication is gone).
 
@@ -153,7 +155,6 @@ pipeline by importing the package.
 # free the GPU first (see § Running the UI), then run in order:
 jupyter nbconvert --to notebook --execute notebooks/deception.ipynb --output deception.ipynb
 jupyter nbconvert --to notebook --execute notebooks/high_stakes.ipynb --output high_stakes.ipynb
-jupyter nbconvert --to notebook --execute notebooks/summary.ipynb --output summary.ipynb
 ```
 
 Or run them interactively. Compare against the audited `safety_probes.ipynb`: **detection layer

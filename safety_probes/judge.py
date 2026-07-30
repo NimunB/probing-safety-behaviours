@@ -27,10 +27,12 @@ from .spec import BehaviourSpec
 
 JUDGE_MODEL = "claude-haiku-4-5"
 
-#: Generations judged per (direction, coef) point. n=6 shows curve SHAPE; bump to ~16-24 for the
-#: final run if judge comparisons between directions at single coefs will be cited (each +1 costs
-#: ~84 generations per eval set).
-N_JUDGE_PROMPTS = 6
+#: Generations judged per (direction, coef) point (final-run n, plan #46; was 6 during
+#: development — n=6 integer scores made the judge curves jumpy, cf. CAA's 50). Each judged eval
+#: set costs 19 points × this many generations. AI Liar's 27 items still cover 24 generation
+#: prompts; deception ID passes NO prompts (judge dropped there — its prompts are byte-identical
+#: under greedy decoding, #40b/#46 — so the ID positive control is NIE-only).
+N_JUDGE_PROMPTS = 24
 
 _judge_client = None
 _judge_init_tried = False
