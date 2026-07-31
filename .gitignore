@@ -10,6 +10,10 @@ deception-detection/
 .env
 *.env
 
+# Agent transcripts. Never commit: an IDE-selection block can paste .env contents verbatim
+# into a transcript, which is how both live keys leaked in the pre-rewrite history.
+docs-for-nimun/claude-conversations/
+
 # --- NOT ignored, deliberately -----------------------------------------------------------
 # data/            ~500 KB of vendored Apollo files; frozen inputs, must be versioned.
 # exported_probes/ ~0.5 MB per behaviour; the only GPU-expensive artefact that is not
