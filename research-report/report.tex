@@ -1,0 +1,411 @@
+\documentclass[conference]{IEEEtran}
+\IEEEoverridecommandlockouts
+\usepackage{cite}
+\usepackage{amsmath,amssymb,amsfonts}
+\usepackage{algorithmic}
+\usepackage{graphicx}
+\usepackage{textcomp}
+\usepackage{xcolor}
+\usepackage{booktabs}
+\usepackage{url}
+
+% Draft placeholder for numbers not yet produced (first run pending on the GPU box).
+\newcommand{\TODO}[1]{\textcolor{red}{[\textbf{TODO:} #1]}}
+\newcommand{\NUM}[1]{\textcolor{blue}{#1}} % blue = placeholder value to be filled from the run
+
+\def\BibTeX{{\rm B\kern-.05em{\sc i\kern-.025em b}\kern-.08em
+    T\kern-.1667em\lower.7ex\hbox{E}\kern-.125emX}}
+\begin{document}
+
+\title{Probing and Steering for Safety-Relevant Behaviours 
+in Large Language Models}
+
+\author{\IEEEauthorblockN{Nimun Kaur Bajwa\thanks{Draft manuscript. Empirical
+results marked in \textcolor{blue}{blue} are placeholders pending the first full
+experimental run; methodology is frozen.}}
+\IEEEauthorblockA{\textit{MSc. Artificial Intelligence}, Queen Mary University of London\\
+{n.k.bajwa@se25.qmul.ac.uk}}}
+
+\maketitle
+
+\begin{abstract}
+Activation probes, linear readouts of a language model's internal
+representations, are used both to \emph{detect} safety-relevant behaviours and,
+by adding their direction back into the residual stream, to \emph{steer} them.
+These are distinct demands on a direction, and prior work has met them
+separately and on different properties: Marks and Tegmark find that
+difference-of-means directions for truth are the most \emph{causal};
+Goldowsky-Dill et al. find that logistic-regression probes are the best
+\emph{detectors} of strategic deception; McKenzie et al. find that
+sequence-pooled probes detect high-stakes interactions on par with far larger
+monitors. Left open is whether, for a given safety behaviour, the direction that
+best detects it is also the one that best steers it, or whether there is a
+\emph{read/write dissociation} in which logistic-regression directions detect
+best while mass-mean directions steer best. This thesis investigates that
+question across a range of safety behaviours in Llama-3.1-8B-Instruct. To keep
+the comparison uniform across behaviours, each behaviour is described by one
+specification (its data, token masking, readout format and steering mode) and
+run through a single shared pipeline: layer selection by complementary criteria,
+a grid of probe architectures, in- and out-of-distribution evaluation, and
+calibrated activation steering scored by both a normalized indirect effect and
+an LLM judge that separately rates behaviour and coherence. This draft reports
+the results on two behaviours, deception and high-stakes awareness; the thesis
+then extends the same study to sycophancy, user intention and refusal, and asks
+which sparse-autoencoder latents carry each behaviour.
+\TODO{tighten once results are in; state the headline finding in one sentence.}
+\end{abstract}
+
+\begin{IEEEkeywords}
+mechanistic interpretability, linear probes, activation steering, AI safety,
+deception detection, high-stakes monitoring, sparse autoencoders
+\end{IEEEkeywords}
+
+\section{Introduction}
+
+As language models are deployed in consequential settings, cheap and reliable
+monitoring of their internal state becomes a practical safety requirement.
+A promising family of monitors are \emph{activation probes}: linear readouts
+of the residual stream that flag a property of interest at a fraction of the
+cost of a full auxiliary model~\cite{alain2018,mckenzie2025}. Two questions
+determine whether such a probe is useful. First, does it \emph{detect} the
+property; that is, does its score separate positive from negative examples,
+in-distribution and, crucially, out-of-distribution? Second, is the direction
+it identifies \emph{causally implicated} in the behaviour; that is, does adding
+it to the residual stream during generation actually change what the model does?
+These are distinct properties, and the interpretability literature has largely
+studied them apart.
+
+Three lines of work anchor this thesis. Marks and Tegmark~\cite{marks2024},
+studying truth, find that simple difference-of-means (``mass-mean'') directions
+are the \emph{most causal} (best at flipping the model's treatment of a
+statement), even though logistic regression classifies at least as accurately.
+Goldowsky-Dill et al.~\cite{goldowsky2025} (henceforth Apollo), studying
+strategic deception, find that logistic-regression probes are the strongest
+\emph{detectors} across diverse datasets. McKenzie et al.~\cite{mckenzie2025}
+(henceforth the high-stakes work), studying whether an interaction ``might lead
+to significant harm,'' find that probes which \emph{pool over the whole
+sequence} (mean or learned attention) far outperform last-token probes, and
+rival prompted or finetuned monitors many orders of magnitude more expensive.
+
+Read together, these results suggest, but do not test, a \emph{read/write
+dissociation}: the direction that best \emph{reads} a behaviour off the
+activations may not be the direction that best \emph{writes} it back in. This
+thesis makes that hypothesis explicit and tests it, for the first time, on
+safety behaviours rather than on truth.
+
+\subsection*{Contributions}
+\begin{itemize}
+  \item \textbf{The first test of the read/write dissociation on safety
+  behaviours}: for each behaviour the same activations yield mass-mean,
+  logistic-regression and attention probes for detection and mass-mean,
+  logistic-regression and contrastive-activation-addition (CAA) directions for
+  steering, evaluated under one protocol, so that ``which direction detects
+  best'' and ``which direction steers best'' can be compared directly.
+  \item \textbf{A study across five safety behaviours}: deception and
+  high-stakes awareness in this draft, and sycophancy, user intention and
+  refusal in the full thesis, with the learned directions additionally compared
+  against probes trained on sparse-autoencoder latents to identify which latents
+  carry each behaviour.
+  \item \textbf{A layer-selection method for behaviours lacking a token-level
+  readout}: a normalized-indirect-effect sweep with a baseline-separability
+  gate, standing in for the interchange-patching localisation used by
+  Marks and Tegmark where a one-token minimal pair is unavailable.
+  \item \textbf{A reusable pipeline that makes the study uniform}: each behaviour
+  is a single specification (data, token masking, readout format, steering mode)
+  run through identical layer selection, probe training, in- and
+  out-of-distribution evaluation, and calibrated steering, so results are
+  comparable across behaviours and new behaviours are added as configuration.
+\end{itemize}
+
+\section{Related Work}
+
+\paragraph{Linear representations and probing}
+The hypothesis that models represent features as directions in activation
+space~\cite{elhage2022} motivates linear probing~\cite{alain2018}. Probes have
+been trained for truthfulness~\cite{azaria2023,marks2024}, deception
+\cite{goldowsky2025}, and hazardous or high-stakes content~\cite{mckenzie2025}.
+Generalisation of such probes is contested~\cite{levinstein2024}, which is why
+we foreground out-of-distribution evaluation throughout.
+
+\paragraph{Mass-mean versus logistic regression}
+Marks and Tegmark~\cite{marks2024} introduce mass-mean probing and show its
+directions are more causally implicated than those of logistic regression or
+contrast-consistent search, despite comparable classification accuracy; they
+localise truth to a small group of ``summarisation'' hidden states via
+interchange patching and evaluate interventions strictly out-of-distribution.
+We adopt their plain (uncentred-covariance) mass-mean direction and their
+mean-gap steering calibration, and we test whether their causal-superiority
+finding transfers to deception and high-stakes.
+
+\paragraph{Detecting strategic deception}
+Apollo~\cite{goldowsky2025} train probes on \emph{instructed pairs}: a fact
+completed under an honest versus a deceptive system prompt, taking activations
+over the response tokens (excluding the final few, so the probe captures intent
+rather than the completed claim) and aggregating per-token scores at
+evaluation. They report AUROC and recall at a low false-positive rate, and note
+a spurious correlation whereby the probe partly tracks whether a scenario is
+\emph{about} deception. We reuse their instructed-pairs construction and
+per-token training, and evaluate out-of-distribution on the AI-Liar
+dataset~\cite{pacchiardi2024}.
+
+\paragraph{Detecting high-stakes interactions}
+The high-stakes work~\cite{mckenzie2025} trains probes on a synthetic dataset of
+high- and low-stakes user interactions and evaluates on curated real-world
+datasets. They compare last-token, mean, softmax and learned-attention pooling,
+finding sequence-pooling essential, and report AUROC and true-positive rate at
+$1\%$ false-positive rate. We adopt their dataset, pooling comparison and
+metrics.
+
+\paragraph{Contrastive activation addition}
+Rimsky et al.~\cite{rimsky2024} steer behaviour by adding the mean difference
+between contrastive pairs, extracted at the answer position and added at every
+subsequent position. We include a CAA direction as a third steering vector,
+extracted at the final prompt token so that it is not numerically identical to
+the mass-mean direction on paired data.
+
+\paragraph{Sparse autoencoders}
+SAEs decompose activations into sparse, putatively interpretable
+latents~\cite{cunningham2023,bricken2023}. Apollo report that probes trained on
+SAE latents \emph{underperform} raw-activation probes for deception. We
+therefore frame our planned SAE-latent probing as \emph{interpretation} of the
+learned directions (which latents carry the signal) rather than as a competing
+detector.
+
+\section{Method}
+
+\subsection{Model and behaviour specification}
+All experiments use Llama-3.1-8B-Instruct in 8-bit precision, loaded once and
+shared across behaviours; probing operates on the residual stream, which is
+unaffected by weight quantisation. Each behaviour is described by a single
+specification object fixing: its positive class; its token-mask policy; the
+constrained yes/no readout used for causal measurement; the LLM-judge rubric;
+and the steering mode, additive or (reserved for refusal) directional ablation.
+Adding a behaviour is thus a matter of data plus a specification.
+
+\subsection{Data and token masking}
+\textbf{Deception (positive $=$ dishonest).} We use $512$ true statements, each
+wrapped in an honest and a deceptive system prompt to form a paired training
+set~\cite{goldowsky2025}. At training we take mean/last activations over the
+assistant's response tokens \emph{excluding the final five tokens}; at
+evaluation we score all response tokens. Out-of-distribution evaluation uses
+AI-Liar~\cite{pacchiardi2024}, in which the same answer is honest or deceptive
+depending on the system framing; we note this evaluation is off-policy for our
+model.
+\textbf{High-stakes (positive $=$ high-stakes).} We use the synthetic
+\emph{models-under-pressure} training split~\cite{mckenzie2025}, pooling over
+all tokens of the chat-formatted user turn, with training and evaluation using
+the same mask. Out-of-distribution evaluation uses two real-world
+configurations (human/assistant conversations and tool-use dialogues).
+Splits are \emph{group-aware}: all tone, language and style variants sharing a
+scenario identifier are kept on the same side of every split and
+cross-validation fold, preventing near-duplicate leakage.
+
+\subsection{Layer selection}
+Neither probing paper selects layers by patching; patching requires a one-token
+minimal pair and a token-level readout, which our behaviours lack. We therefore
+use two complementary, purpose-matched diagnostics, and choose the final layers
+manually from the resulting plots:
+\begin{itemize}
+  \item \emph{Detection layer}: group-aware five-fold cross-validated AUROC of a
+  mass-mean probe on mean-pooled activations, swept over all layers.
+  \item \emph{Steering block}: a per-layer \emph{normalized indirect effect}
+  (NIE). Following Marks and Tegmark~\cite{marks2024}, we add the
+  mean-gap-calibrated mass-mean direction at a single layer inside a few-shot
+  yes/no readout and measure
+  $\mathrm{NIE} = (\mathrm{PD}_{\text{steered}} - \mathrm{PD}_{\text{base}}) /
+  (\mathrm{PD}^{+} - \mathrm{PD}^{-})$, where $\mathrm{PD} = P(\text{YES}) -
+  P(\text{NO})$ at the final position. A gate rejects the metric where the
+  baseline class gap $\mathrm{PD}^{+}-\mathrm{PD}^{-}$ is near zero, i.e.\ where
+  the model cannot self-report the behaviour and the ratio is undefined.
+\end{itemize}
+
+\subsection{Probe grid}
+At the detection layer we train five probes: mass-mean and logistic regression,
+each with last-token and mean pooling, plus a learned single-head attention
+probe (three seeds). Mass-mean uses the plain difference-of-means direction;
+we omit the covariance-corrected variant, which converges to the
+logistic-regression direction~\cite{marks2024} and would merely duplicate it.
+The mean-pooled logistic probe is trained \emph{per token} following
+Apollo~\cite{goldowsky2025} (every masked token is a labelled row); because a
+fixed linear probe satisfies $\overline{w\cdot x} = w\cdot\bar{x}$, this changes
+only training, not evaluation, and it makes per-token score heatmaps
+interpretable. Per-token training rows are uniformly subsampled to a fixed cap
+for tractability; the forward pass always sees intact prompts, so no context is
+lost.
+
+\subsection{Detection metrics}
+For every (probe, dataset) pair, in- and out-of-distribution, we report AUROC
+with bootstrap confidence intervals; true-positive rate at $1\%$
+false-positive rate (within-dataset negatives); and accuracy at a
+\emph{per-probe} decision boundary frozen on the training split: the
+class-mean midpoint for mass-mean (its projection is not zero-centred), and the
+model's own boundary ($\text{logit}=0$; $p=0.5$) for the trained probes.
+
+\subsection{Causal steering}
+We compare three learned directions, mass-mean, logistic-regression weights,
+and CAA (extracted at the final prompt token), each calibrated so that a
+coefficient of $1.0$ moves the mean negative representation onto the mean
+positive along that direction~\cite{marks2024}. A separate direction is
+extracted and calibrated \emph{per layer} of the steering block (a documented
+departure from adding a single vector across the block, motivated by the drift
+of the residual basis across depth), and added at every token position
+following CAA~\cite{rimsky2024}, over a coefficient sweep
+$\{-2,-1,-0.5,0,0.5,1,2\}$. We steer \emph{in-distribution first} as a positive
+control, distinguishing ``the direction is not causal'' from ``the direction is
+causal but does not transfer,'' and then out-of-distribution as the headline
+result. Each steered generation is scored two ways: by the NIE above, and by an
+LLM judge (Claude Haiku) that rates the behaviour and, separately, coherence
+$1$--$10$; the coherence axis guards against interventions that ``succeed'' only
+by degrading the text.
+
+\section{Results}
+\TODO{All numbers below are placeholders; the first full run is pending on the
+GPU environment. Structure and metrics are final.}
+
+\subsection{Where do the behaviours live?}
+The cross-validated AUROC sweep is expected to peak in early-to-middle layers
+for deception (near $28\%$ depth, following~\cite{goldowsky2025}) and
+mid-network for high-stakes (following~\cite{mckenzie2025}), with the NIE sweep
+identifying a contiguous causally-implicated block.
+\TODO{report chosen DEC/HS detection layers and steering blocks; include the
+CV-AUROC and NIE-per-layer figures, and the deception interchange-patching
+heatmap.}
+
+\subsection{Linear structure}
+\TODO{PCA scatter (mean-pooled, centred) plus projection-onto-probe-direction
+histograms per behaviour; comment on separability and the topic confound.}
+
+\subsection{Detection, in- and out-of-distribution}
+\begin{table}[htbp]
+\caption{Detection metrics (placeholder). One block per behaviour;
+columns are in-distribution test and each OOD set.}
+\begin{center}
+\begin{tabular}{llccc}
+\toprule
+Probe & Eval & AUROC & TPR@1\%FPR & Acc. \\
+\midrule
+MM (last)     & ID / OOD & \NUM{--} & \NUM{--} & \NUM{--} \\
+MM (mean)     & ID / OOD & \NUM{--} & \NUM{--} & \NUM{--} \\
+LR (last)     & ID / OOD & \NUM{--} & \NUM{--} & \NUM{--} \\
+LR (mean)     & ID / OOD & \NUM{--} & \NUM{--} & \NUM{--} \\
+Attention     & ID / OOD & \NUM{--} & \NUM{--} & \NUM{--} \\
+\bottomrule
+\end{tabular}
+\label{tab:detection}
+\end{center}
+\end{table}
+We expect sequence-pooling probes to dominate last-token probes, especially for
+high-stakes~\cite{mckenzie2025}, and logistic regression to be the strongest
+deception detector~\cite{goldowsky2025}.
+\TODO{fill Table~\ref{tab:detection}; report ROC curves.}
+
+\subsection{Causal steering: the read/write comparison}
+\begin{table}[htbp]
+\caption{Steering effect (placeholder). NIE and judged behaviour shift at
+matched coefficient, per direction, in- and out-of-distribution.}
+\begin{center}
+\begin{tabular}{llcc}
+\toprule
+Direction & Setting & NIE & Judge $\Delta$behaviour \\
+\midrule
+Mass-mean & ID / OOD & \NUM{--} & \NUM{--} \\
+Logistic  & ID / OOD & \NUM{--} & \NUM{--} \\
+CAA       & ID / OOD & \NUM{--} & \NUM{--} \\
+\bottomrule
+\end{tabular}
+\label{tab:steering}
+\end{center}
+\end{table}
+The central test: if logistic regression tops Table~\ref{tab:detection} while
+mass-mean tops Table~\ref{tab:steering}, the read/write dissociation holds for
+safety behaviours as it does for truth~\cite{marks2024}.
+\TODO{fill Table~\ref{tab:steering}; include dose-response curves (behaviour and
+coherence versus coefficient) and qualitative steered generations.}
+
+\section{Discussion}
+\TODO{Interpret the read/write comparison; whether pooling and layer findings
+replicate at 8B; the practical implication that a good monitor need not be a
+good control knob, and vice versa.}
+
+\subsection{Limitations}
+The AI-Liar evaluation is off-policy for our model, so deception transfer is a
+lower bound relative to on-policy evaluation~\cite{goldowsky2025}. We study a
+single 8B model, below the scale of the reference works. The LLM judge is
+single-source and should be validated against a small hand-labelled set. PCA
+separation can reflect topic confounds rather than the behaviour itself
+\cite{goldowsky2025}, and we retain no analogue of the \emph{likely} dataset
+that Marks and Tegmark use to rule out a probability-versus-truth confound
+\cite{marks2024}.
+
+\section{Extending the Study}
+The two extensions below are core aims of the thesis, built on the results this
+draft establishes rather than left as speculative future work. The pipeline
+above makes them cheap to run; the contribution is the additional evidence they
+provide, not the tooling.
+
+\paragraph{More behaviours}
+Each new behaviour is a specification, not new code.
+\emph{Sycophancy} fits the contrastive-pair mould directly, with an A/B
+answer-choice readout replacing the yes/no readout (the readout target tokens
+are already configurable). \emph{User intention}, for example benign versus
+manipulative or harmful intent behind a request, uses a full-sequence mask over
+the user turn, closely mirroring the high-stakes recipe. \emph{Refusal} is the
+motivating case for the steering mode being abstracted: following the
+refusal-direction literature, it is best manipulated by \emph{directional
+ablation}, projecting the direction out of the residual stream rather than
+adding to it, and the steering hook already supports this mode.
+
+\paragraph{Probing on sparse-autoencoder latents}
+Because activations are cached to disk, the SAE analysis is post-processing. We
+encode the cached residual-stream activations with an SAE for this model and
+train the same probe grid on its \emph{latents} rather than on the raw residual
+stream, asking whether a small set of interpretable latents suffices to detect
+each behaviour and which latents carry the signal. Given that probes on SAE
+latents underperform raw-activation probes for deception~\cite{goldowsky2025},
+the contribution here is interpretive, identifying \emph{which} latents encode
+deception and high-stakes, rather than a bid to beat the raw-activation
+detector.
+
+\section{Conclusion}
+\TODO{One paragraph once results exist: state whether the read/write
+dissociation holds across both safety behaviours, and what that implies for
+choosing between probe-based monitoring and probe-based control.}
+
+\section*{Acknowledgment}
+This work builds on the open datasets and code released by the authors of
+\cite{marks2024,goldowsky2025,mckenzie2025,rimsky2024} and on the ARENA
+educational materials.
+
+\begin{thebibliography}{00}
+\bibitem{marks2024} S. Marks and M. Tegmark, ``The geometry of truth: Emergent
+linear structure in LLM representations of true/false datasets,'' in
+\emph{Conf. on Language Modeling (COLM)}, 2024.
+\bibitem{goldowsky2025} N. Goldowsky-Dill, B. Chughtai, S. Heimersheim, and
+M. Hobbhahn, ``Detecting strategic deception using linear probes,''
+arXiv:2502.03407, 2025.
+\bibitem{mckenzie2025} A. McKenzie, U. Pawar, P. Blandfort, W. Bankes,
+D. Krueger, E. S. Lubana, and D. Krasheninnikov, ``Detecting high-stakes
+interactions with activation probes,'' in \emph{NeurIPS}, 2025.
+\bibitem{rimsky2024} N. Rimsky, N. Gabrieli, J. Schulz, M. Tong, E. Hubinger,
+and A. Turner, ``Steering Llama 2 via contrastive activation addition,'' in
+\emph{Proc. ACL}, 2024.
+\bibitem{alain2018} G. Alain and Y. Bengio, ``Understanding intermediate layers
+using linear classifier probes,'' arXiv:1610.01644, 2018.
+\bibitem{azaria2023} A. Azaria and T. Mitchell, ``The internal state of an LLM
+knows when it's lying,'' arXiv:2304.13734, 2023.
+\bibitem{levinstein2024} B. A. Levinstein and D. A. Herrmann, ``Still no lie
+detector for language models,'' 2024.
+\bibitem{elhage2022} N. Elhage et al., ``Toy models of superposition,''
+\emph{Transformer Circuits Thread}, 2022.
+\bibitem{cunningham2023} H. Cunningham, A. Ewart, L. Riggs, R. Huben, and
+L. Sharkey, ``Sparse autoencoders find highly interpretable features in
+language models,'' arXiv:2309.08600, 2023.
+\bibitem{bricken2023} T. Bricken et al., ``Towards monosemanticity: Decomposing
+language models with dictionary learning,'' \emph{Transformer Circuits Thread},
+2023.
+\bibitem{pacchiardi2024} L. Pacchiardi et al., ``How to catch an AI liar:
+Lie detection in black-box LLMs by asking unrelated questions,'' in \emph{ICLR},
+2024.
+\end{thebibliography}
+
+\end{document}

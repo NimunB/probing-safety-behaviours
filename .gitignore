@@ -15,6 +15,19 @@ deception-detection/
 # exported_probes/ ~0.5 MB per behaviour; the only GPU-expensive artefact that is not
 #                  reproducible from the repo alone. Commit these.
 
+# LaTeX build artifacts (research-report/report.tex); the PDF is regenerable via latexmk.
+*.aux
+*.log
+*.out
+*.fls
+*.fdb_latexmk
+*.synctex.gz
+*.synctex(busy)
+*.bbl
+*.blg
+*.toc
+research-report/*.pdf
+
 __pycache__/
 *.py[cod]
 .ipynb_checkpoints/
