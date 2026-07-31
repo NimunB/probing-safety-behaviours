@@ -1,0 +1,11 @@
+probe,eval,AUROC,TPR@1%FPR
+MM (last),test (ID),"0.976 [0.97,0.98]",0.862
+MM (last),math (OOD),"0.879 [0.86,0.90]",0.200
+MM (mean),test (ID),"0.928 [0.91,0.94]",0.602
+MM (mean),math (OOD),"0.802 [0.77,0.83]",0.018
+LR (last),test (ID),"0.975 [0.97,0.98]",0.859
+LR (last),math (OOD),"0.847 [0.82,0.87]",0.052
+LR (mean),test (ID),"0.970 [0.96,0.98]",0.790
+LR (mean),math (OOD),"0.825 [0.80,0.85]",0.046
+LR-attention,test (ID),"0.974 [0.96,0.98]",0.865
+LR-attention,math (OOD),"0.861 [0.84,0.88]",0.050

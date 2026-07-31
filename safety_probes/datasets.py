@@ -307,6 +307,7 @@ def load_high_stakes(n_train: int = HS_N_TRAIN, n_test: int = HS_N_TEST) -> High
     all_pairs = list(binary[pair_key]) if pair_key else list(range(len(all_texts)))
 
     unique_pairs = sorted(set(all_pairs), key=str)
+    pair_index = {p: i for i, p in enumerate(unique_pairs)}   # process-stable ids (plan #54)
     pair_perm = np.random.RandomState(runtime.SEED).permutation(len(unique_pairs))
     train_pair_set = {unique_pairs[i] for i in pair_perm[: int(0.8 * len(unique_pairs))]}
 
@@ -328,7 +329,10 @@ def load_high_stakes(n_train: int = HS_N_TRAIN, n_test: int = HS_N_TEST) -> High
             texts=[p[0] for p in tm],
             masks=[p[1] for p in tm],
             labels=t.tensor([float(all_labels[i]) for i in idxs]),
-            pairs=t.tensor([hash(str(all_pairs[i])) for i in idxs]),
+            # Deterministic group ids (plan #54): Python's hash() is randomized per process, and
+            # GroupKFold assigns folds from sorted id values — hashed ids made CV folds differ
+            # between kernels despite the seed. A sorted-index mapping is process-stable.
+            pairs=t.tensor([pair_index[all_pairs[i]] for i in idxs]),
             # RAW scenario text per example, index-aligned — the readout/steering want plain text,
             # not chat-templated. The notebook read these inline as `hs_all_texts[i] for i in idxs`;
             # exposing them here keeps the steering-text selection reproducible from the Split alone.
@@ -448,12 +452,14 @@ class SycophancyData:
 
 
 def _syc_build(rows, labels, groups, idxs) -> Split:
+    group_index = {g: i for i, g in enumerate(sorted(set(groups)))}   # process-stable ids (#54)
     tm = [chat_with_assistant_mask(syc_to_messages(rows[i])) for i in idxs]
     return Split(
         texts=[p[0] for p in tm],
         masks=[p[1] for p in tm],
         labels=t.tensor([float(labels[i]) for i in idxs]),
-        pairs=t.tensor([hash(groups[i]) for i in idxs]),
+        # Deterministic group ids (plan #54) — see the high-stakes note; same fix.
+        pairs=t.tensor([group_index[groups[i]] for i in idxs]),
         extra={
             # plaintext transcripts, index-aligned - the readout wants these (incl. the reply:
             # the classes differ IN the reply, so the gap cannot collapse - sycophancy_plan §5b.1)

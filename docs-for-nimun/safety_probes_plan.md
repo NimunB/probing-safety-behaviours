@@ -1466,6 +1466,21 @@ and the papers. Newest entries appended at the bottom. All decisions confirmed b
    sycophancy section with templated pulls (at run time, per #32). Sequencing note: built before
    the parity gate banked, per explicit user instruction — the sycophancy RUN still waits for
    deception + high-stakes to finish.
+54. **CV folds made process-reproducible: `hash()` group ids → sorted-index ids** (user approval
+   2026-07-31, applied BEFORE the high-stakes re-run so its layer question settles on stable
+   folds). Root cause: Python randomizes `hash()` per process (PYTHONHASHSEED), and sklearn's
+   GroupKFold assigns groups to folds from their sorted values — so the high-stakes and sycophancy
+   loaders produced different CV fold compositions in every fresh kernel despite seed 42
+   (a contributor to the observed HS argmax wobble, 13 vs the audited 20, on a plateau).
+   **Deception was never affected** — its `pair_ids` are plain enumeration indices, which is
+   consistent with its layer-12 selection reproducing exactly across boxes. Present in the audited
+   notebook too (not introduced by the extraction). Fix: two one-line mappings
+   (`{group: i for i, group in enumerate(sorted(set(groups)))}`) in `load_high_stakes` and
+   `_syc_build`; grouping semantics unchanged, split membership never depended on the hashed
+   values. **Proven: all three loaders' pairs tensors are byte-identical across two separate
+   processes** (sha256 digests). One-time consequence: the next HS run's CV folds differ from ALL
+   previous runs' (including the audited one) — one final wobble, then stable forever; the
+   13-vs-20 decision procedure (compare CV values ± fold error, pin via EDIT-HERE) is unchanged.
 
 ## Verification
 

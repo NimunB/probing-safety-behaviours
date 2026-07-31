@@ -78,7 +78,7 @@ nvidia-smi --query-gpu=memory.free --format=csv,noheader     # want >= 20000 MiB
 
 ```bash
 cd probing-safety-behaviours
-/venv/arena-env/bin/python ui_probe.py
+source /venv/main/bin/activate && python ui_probe.py   # venv name varies per instance; /venv/main on the current box
 ```
 
 Expect `env: .../.env`, then a warning if `HF_HOME` points at the wrong cache (it auto-corrects —
@@ -92,7 +92,8 @@ ssh -p $VAST_TCP_PORT_22 -L 8080:127.0.0.1:17860 root@$PUBLIC_IPADDR
 # then open http://localhost:8080
 ```
 On Vast, `$VAST_TCP_PORT_22` and `$PUBLIC_IPADDR` are set in the instance shell — read them there
-(this box: port 41554, IP 77.48.24.250) and substitute the real values into the command.
+(current box, 2026-07: port 16195, IP 89.221.67.172 — these change with every new instance; read
+them from the instance shell, never from this README).
 
 *Caddy (shareable URL + token auth), on a reserved free port:*
 ```bash
@@ -232,5 +233,6 @@ the plotting call sites move into `viz.py` rather than retrofitting later.
 
 ## Environment
 
-Developed on a Vast.ai RTX 3090 (24 GB), Llama-3.1-8B-Instruct in 8-bit, `/venv/arena-env`.
+Originally developed on a Vast.ai RTX 3090 (24 GB), `/venv/arena-env`; since 2026-07-30 running on
+an RTX 5090 (32 GB), `/venv/main`, torch 2.12+cu130 (see plan "Status — 2026-07-30").
 See `requirements.txt` — install torch from the CUDA index first.
