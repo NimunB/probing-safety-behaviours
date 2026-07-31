@@ -1,0 +1,21 @@
+probe,eval,AUROC,TPR@1%FPR
+MM (last),test (ID),"0.948 [0.91,0.98]",n/a (<100 neg)
+MM (last),AI Liar (OOD),"0.959 [0.90,0.99]",n/a (<100 neg)
+MM (last),Roleplaying (OOD),"0.669 [0.63,0.71]",0.011
+MM (last),Deception OOD pool,"0.696 [0.66,0.73]",0.033
+MM (mean),test (ID),"1.000 [1.00,1.00]",n/a (<100 neg)
+MM (mean),AI Liar (OOD),"0.992 [0.97,1.00]",n/a (<100 neg)
+MM (mean),Roleplaying (OOD),"0.654 [0.61,0.69]",0.016
+MM (mean),Deception OOD pool,"0.679 [0.64,0.72]",0.018
+LR (last),test (ID),"0.996 [0.99,1.00]",n/a (<100 neg)
+LR (last),AI Liar (OOD),"0.818 [0.70,0.93]",n/a (<100 neg)
+LR (last),Roleplaying (OOD),"0.554 [0.51,0.60]",0.011
+LR (last),Deception OOD pool,"0.571 [0.53,0.61]",0.023
+LR (mean),test (ID),"1.000 [1.00,1.00]",n/a (<100 neg)
+LR (mean),AI Liar (OOD),"0.974 [0.93,1.00]",n/a (<100 neg)
+LR (mean),Roleplaying (OOD),"0.706 [0.67,0.74]",0.078
+LR (mean),Deception OOD pool,"0.722 [0.69,0.76]",0.075
+LR-attention,test (ID),"1.000 [1.00,1.00]",n/a (<100 neg)
+LR-attention,AI Liar (OOD),"0.989 [0.97,1.00]",n/a (<100 neg)
+LR-attention,Roleplaying (OOD),"0.657 [0.62,0.69]",0.049
+LR-attention,Deception OOD pool,"0.685 [0.65,0.72]",0.055

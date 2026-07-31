@@ -139,6 +139,41 @@ def generate_steered(prompt_text: str, hook: SteeringHook | None, max_new_tokens
     return tokenizer.decode(gen[0][inp["input_ids"].shape[1]:], skip_special_tokens=True).strip()
 
 
+@t.no_grad()
+def generate_steered_batch(prompt_texts: list[str], hook: SteeringHook | None,
+                           max_new_tokens: int = 80, batch_size: int = 8) -> list[str]:
+    """Batched greedy generation with an optional steering hook (plan #52b).
+
+    Same parameters as `generate_steered` (greedy, max_length=512 truncation, eos padding), but
+    processes prompts in batches so the GPU is actually used. Prompts are LEFT-padded per batch so
+    generation continues from the real last token; `padding_side` is flipped locally and restored
+    (runtime pins it "right" for the mask/indexing paths — do not change that global). Steering
+    still applies at every position; pad positions are attention-masked, so their steered values
+    never reach a real token. Caveat: batch padding can shift decode-side floating point, so
+    generations may differ slightly in wording from the one-at-a-time path — acceptable for the
+    judge, which has no cross-run comparability requirement (#44/#47)."""
+    model, tokenizer = runtime.get_model(), runtime.get_tokenizer()
+    out: list[str] = []
+    old_side = tokenizer.padding_side
+    tokenizer.padding_side = "left"
+    try:
+        handles = hook.enable() if hook is not None else []
+        try:
+            for i in range(0, len(prompt_texts), batch_size):
+                inp = tokenizer(prompt_texts[i:i + batch_size], return_tensors="pt", padding=True,
+                                truncation=True, max_length=512).to(model.device)
+                gen = model.generate(**inp, max_new_tokens=max_new_tokens, do_sample=False,
+                                     pad_token_id=tokenizer.eos_token_id)
+                n_inp = inp["input_ids"].shape[1]
+                out.extend(tokenizer.decode(g[n_inp:], skip_special_tokens=True).strip() for g in gen)
+        finally:
+            for h in handles:
+                h.remove()
+    finally:
+        tokenizer.padding_side = old_side
+    return out
+
+
 # =========================================================================================
 # The READOUT — our measurement apparatus (notebook §1g).
 # =========================================================================================

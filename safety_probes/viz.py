@@ -225,12 +225,15 @@ def plot_roc_curves(grid, ev, title):
     catches positives before its first false alarms. matplotlib so it renders on GitHub."""
     _use_style()
     fig, ax = plt.subplots(figsize=(5.6, 5.2))
+    # Solid lines, full opacity (user decision 2026-07-30; dashed variant tried and rejected).
+    # KNOWN LIMIT: near-ceiling curves are COINCIDENT, so the last-drawn probe covers the others
+    # on ceiling eval sets — read the per-probe AUROCs from the legend/table there.
     for i, (probe_name, (probe, pooling)) in enumerate(grid.items()):
         sc = probe_scores(probe, pooling, ev["mean"], ev["last"], ev.get("full"), ev.get("fmask"))
         y = ev["labels"].numpy()
         fpr, tpr, _ = roc_curve(y, sc)
-        ax.plot(fpr, tpr, color=PROBE_COLORS[i % len(PROBE_COLORS)], lw=1.8, alpha=0.7,
-                label=f"{probe_name}  ({roc_auc_score(y, sc):.3f})")   # alpha so overlapping ~perfect curves show through
+        ax.plot(fpr, tpr, color=PROBE_COLORS[i % len(PROBE_COLORS)], lw=1.8,
+                label=f"{probe_name}  ({roc_auc_score(y, sc):.3f})")
     ax.plot([0, 1], [0, 1], color="#888", lw=1.2, ls="--", label="Chance", zorder=0)
     ax.set_xlabel("False positive rate")
     ax.set_ylabel("True positive rate")
@@ -565,10 +568,11 @@ def plot_steering_effects(results, title):
                 fig.add_trace(go.Scatter(x=r["coef"], y=r[key], name=method,
                                          line=dict(color=c), marker=dict(color=c),
                                          showlegend=False), row=1, col=col)
-    fig.update_xaxes(title_text="steering coefficient (1.0 = cross mean gap)", row=1, col=1)
+    for col in (1, 2, 3):     # every panel gets labelled axes (user request 2026-07-30)
+        fig.update_xaxes(title_text="steering coefficient (1.0 = cross mean gap)", row=1, col=col)
     fig.update_yaxes(title_text="NIE (norm. readout shift)", row=1, col=1)
-    for col in (2, 3):
-        fig.update_yaxes(range=[1, 10], row=1, col=col)
+    fig.update_yaxes(title_text="judge: behaviour score (1-10)", range=[1, 10], row=1, col=2)
+    fig.update_yaxes(title_text="judge: coherence score (1-10)", range=[1, 10], row=1, col=3)
     fig.update_layout(height=400, width=1250, title=title)
     fig.show()
 

@@ -112,24 +112,39 @@ class AttentionProbe(t.nn.Module):
 
 
 def train_attention_probe(acts, masks, labels, n_epochs=200, lr=5e-3, weight_decay=1e-3, seed=0,
-                          desc=None):
-    """Full-batch training on CPU (probe and acts both live there), so the GPU sits at 0% while this
-    runs — with no output it looks like a hang. Pass desc= to get a live epoch bar + loss; the loss
-    falling is the signal it is working. Training itself is unchanged (2026-07-20, plan #42b).
+                          desc=None, chunk_size=256):
+    """GPU-chunked full-batch training (plan #52a, 2026-07-30; previously CPU full-batch).
 
-    MEMORY NOTE: `attention_probe_forward` calls `x.float()` on the full batch every epoch. For
-    the high-stakes train set (3000 x 256 x 4096) that is a ~25 GB fp32 copy per epoch. If this
-    OOMs on a smaller box, minibatch here rather than shrinking the training set.
+    Why: the old version converted the WHOLE fp16 activation tensor to fp32 on CPU every epoch —
+    memory-bound, so it crawled regardless of core count (~37 min/layer on the 128-core box).
+    Chunks now stream to the GPU when available.
+
+    THE MATH IS UNCHANGED: chunks accumulate gradients and the optimizer steps ONCE per epoch, so
+    the per-epoch gradient equals the old full-batch gradient (sum of chunk BCE sums / N) and the
+    AdamW trajectory is preserved up to device float-order. Init is seeded on the CPU RNG exactly
+    as before, so seed s still means the same initial probe. The trained probe is returned on CPU,
+    as before — every downstream consumer is unaffected. Falls back to CPU (still chunked) when
+    no GPU is present.
     """
     t.manual_seed(seed)
-    probe = AttentionProbe(d_model=acts.shape[-1])
+    probe = AttentionProbe(d_model=acts.shape[-1])          # CPU init: same numbers as the audited runs
+    device = "cuda" if t.cuda.is_available() else "cpu"
+    probe = probe.to(device)
     opt = t.optim.AdamW(probe.parameters(), lr=lr, weight_decay=weight_decay)
-    crit = t.nn.BCEWithLogitsLoss()
+    crit = t.nn.BCEWithLogitsLoss(reduction="sum")
+    n = acts.shape[0]
+    labels_f = labels.float().to(device)
     probe.train()
     loop = tqdm(range(n_epochs), desc=desc, leave=False) if desc else range(n_epochs)
     for _ in loop:
-        loss = crit(probe(acts, masks), labels)
-        opt.zero_grad(); loss.backward(); opt.step()
+        opt.zero_grad()
+        epoch_loss = 0.0
+        for i in range(0, n, chunk_size):
+            xc, mc = acts[i:i + chunk_size].to(device), masks[i:i + chunk_size].to(device)
+            loss_c = crit(probe(xc, mc), labels_f[i:i + chunk_size]) / n
+            loss_c.backward()
+            epoch_loss += loss_c.item()
+        opt.step()
         if desc:
-            loop.set_postfix(loss=f"{loss.item():.4f}")
-    return probe.eval()
+            loop.set_postfix(loss=f"{epoch_loss:.4f}")
+    return probe.cpu().eval()

@@ -67,3 +67,21 @@ it is intentionally not fetched.
 
 `meta-llama/Llama-3.1-8B-Instruct`, loaded in 8-bit, ~15 GB in the HF cache. Never vendored —
 re-download on each new instance. Requires `HF_TOKEN` (gated repo).
+
+## Sycophancy factorial data (added 2026-07-31, sycophancy_plan v2)
+
+Source: `github.com/cincynlp/disentangle-sycophancy` at commit
+`217b89808d07e978a7c8fac37e8ff363e29ad8ef` (data released with arXiv 2509.21305,
+"Sycophancy Is Not One Thing"). **No license file in the source repo** — same caveat class as the
+Apollo files: check before making this repo public. Train domains: cities_pos, sp_en_trans,
+claims, companies; OOD domain: math.
+
+```
+sha256sum -c <<'SUMS'
+655e64d88e5bddaa0a040d13cc01e4e33ac244c45f89be16ebf5b7fe5020bf28  data/sycophancy/cities_pos_factorial.json
+12a629f0cb20ad4ffa0b9f11fa49256ba4e1ecab45f55051e546a4ebd6c10ade  data/sycophancy/claims_factorial.json
+925a95216670258564102777344e491dea676a15bc876dafe85a0020631e2766  data/sycophancy/companies_factorial.json
+b5516e5462f8de5c07eaed13327a61de21c5e5821852ff97f59d362bcb69eac8  data/sycophancy/math_factorial.json
+78d8c89addf2520e72eb21ec739eb1850d97760270301f681f8bf689eaeee946  data/sycophancy/sp_en_trans_factorial.json
+SUMS
+```

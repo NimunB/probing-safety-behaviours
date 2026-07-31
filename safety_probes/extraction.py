@@ -59,7 +59,7 @@ def cached(key: str, fn):
 def extract_pooled_all_layers(
     texts: list[str],
     det_masks: list[Bool[Tensor, " seq"]],
-    batch_size: int = 8,
+    batch_size: int = 16,   # was 8 (sized for the 24 GB card); 16 fits the 32 GB card easily (#52c)
     max_length: int = 512,
     desc: str = "extracting",
 ) -> tuple[Float[Tensor, "n layers d"], Float[Tensor, "n layers d"]]:

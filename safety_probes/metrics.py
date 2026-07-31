@@ -110,8 +110,8 @@ def build_probe_grid(train_mean, train_last, train_masks_padded, train_acts_full
     print(f"  LR (mean) per-token training set: {Xtok.shape[0]} token-rows")
     grid["LR (mean)"] = (LRProbe.from_data(Xtok, ytok), "mean");          _done("LR (mean)")
     # Attention probe: 3 seeds, all kept for the CI.
-    # SLOWEST step: full-batch CPU training, so the GPU reads 0% throughout — not a stall.
-    print("  LR-attention: 3 seeds x 200 epochs, full-batch on CPU (GPU will read 0%)...")
+    # Slowest step, now GPU-chunked (#52a): same full-batch gradient, chunks streamed to the GPU.
+    print("  LR-attention: 3 seeds x 200 epochs, GPU-chunked full-batch training (#52a)...")
     attn_probes = [train_attention_probe(train_acts_full, train_masks_padded, labels, seed=s,
                                          desc=f"    LR-attention seed {s + 1}/3")
                    for s in range(3)]

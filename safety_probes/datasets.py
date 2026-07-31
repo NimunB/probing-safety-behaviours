@@ -373,3 +373,144 @@ def load_high_stakes_ood(configs: tuple[str, ...] = ("anthropic_hh_balanced",)) 
         )
         print(f"{cfg}: {len(out[cfg])} examples ({int(out[cfg].labels.sum())} high-stakes)")
     return out
+
+
+# =========================================================================================
+# Sycophancy (behaviour 3) — disentangle-sycophancy factorial data (sycophancy_plan v2)
+# =========================================================================================
+
+SYC_MAX_LEN = 256
+SYC_N_TRAIN, SYC_N_TEST = 1500, 500      # per class (sycophancy_plan, decided 2026-07-30)
+SYC_TRAIN_DOMAINS = ("cities_pos", "sp_en_trans", "claims", "companies")
+SYC_OOD_DOMAIN = "math"
+DISYCO_COMMIT = "217b89808d07e978a7c8fac37e8ff363e29ad8ef"  # pinned; see data/PROVENANCE.md
+
+
+def _syc_rows(domain: str) -> list[dict]:
+    path = runtime.PROJECT_ROOT / "data" / "sycophancy" / f"{domain}_factorial.json"
+    if not path.is_file():
+        raise FileNotFoundError(f"{path} missing - vendored from cincynlp/disentangle-sycophancy "
+                                f"@ {DISYCO_COMMIT[:8]}; see data/PROVENANCE.md")
+    return json.loads(path.read_text())
+
+
+def _syc_label(r: dict) -> int | None:
+    """Label mapping, sycophancy_plan §3.
+
+    sycophantic (1) = response ECHOES a WRONG user claim (ag==1, user_claim_is_correct False).
+    candid      (0) = response states the TRUTH (truth_is_correct True) — this includes both
+                      corrections (user was wrong) and GENUINE AGREEMENTS (user was right;
+                      the mandatory anti-echo-shortcut hard negatives).
+    dropped (None)  = praise variants (synthetic wording; praise is the OTHER sycophancy axis
+                      per arXiv 2509.21305) and contrarian-wrong rows (disagreeing with a
+                      correct user is just wrong, not candid).
+    """
+    if r["praise_present"]:
+        return None
+    if r["ag"] == 1 and not r["user_claim_is_correct"]:
+        return 1
+    if r["truth_is_correct"]:
+        return 0
+    return None
+
+
+def syc_to_messages(r: dict) -> list[dict]:
+    """'Human: X' / 'Assistant: Y' record -> chat messages (tokenization stays in chat.py)."""
+    user = r["prompt"].strip()
+    user = user[len("Human:"):].strip() if user.startswith("Human:") else user
+    asst = r["response"].strip()
+    asst = asst[len("Assistant:"):].strip() if asst.startswith("Assistant:") else asst
+    return [{"role": "user", "content": user}, {"role": "assistant", "content": asst}]
+
+
+def syc_plaintext(r: dict) -> str:
+    """Plaintext transcript for the readout/judge (same 'Role: content' shape as dec_plaintext)."""
+    m = syc_to_messages(r)
+    return f"Human: {m[0]['content']}\nAssistant: {m[1]['content']}"
+
+
+def _syc_gather(domains: tuple[str, ...]) -> tuple[list[dict], list[int], list[str]]:
+    """All usable rows across domains -> (rows, labels, prompt-group ids)."""
+    rows, labels, groups = [], [], []
+    for dom in domains:
+        for r in _syc_rows(dom):
+            lbl = _syc_label(r)
+            if lbl is None:
+                continue
+            rows.append(r); labels.append(lbl); groups.append(f"{dom}:{r['prompt']}")
+    return rows, labels, groups
+
+
+@dataclass
+class SycophancyData:
+    train: Split
+    test: Split
+
+
+def _syc_build(rows, labels, groups, idxs) -> Split:
+    tm = [chat_with_assistant_mask(syc_to_messages(rows[i])) for i in idxs]
+    return Split(
+        texts=[p[0] for p in tm],
+        masks=[p[1] for p in tm],
+        labels=t.tensor([float(labels[i]) for i in idxs]),
+        pairs=t.tensor([hash(groups[i]) for i in idxs]),
+        extra={
+            # plaintext transcripts, index-aligned - the readout wants these (incl. the reply:
+            # the classes differ IN the reply, so the gap cannot collapse - sycophancy_plan §5b.1)
+            "raw": [syc_plaintext(rows[i]) for i in idxs],
+            # user turns only, for generation prompts (dedupe before use: rows share prompts)
+            "user": [syc_to_messages(rows[i])[0]["content"] for i in idxs],
+            # genuine-agreement flag per example, for the anti-shortcut check (plan §7)
+            "ga": [bool(rows[i]["ga"]) for i in idxs],
+        },
+    )
+
+
+def load_sycophancy(n_train: int = SYC_N_TRAIN, n_test: int = SYC_N_TEST) -> SycophancyData:
+    """Train/ID: 4 factorial domains, pair-aware 80/20 by PROMPT group (all responses to one
+    prompt stay on one side - the leakage rule), then balanced per-class subsample."""
+    rows, labels, groups = _syc_gather(SYC_TRAIN_DOMAINS)
+    unique_groups = sorted(set(groups))
+    perm = np.random.RandomState(runtime.SEED).permutation(len(unique_groups))
+    train_set = {unique_groups[i] for i in perm[: int(0.8 * len(unique_groups))]}
+
+    def take_balanced(idxs, n_per_class):
+        out, counts = [], {0: 0, 1: 0}
+        for i in idxs:
+            if counts[labels[i]] < n_per_class:
+                out.append(i); counts[labels[i]] += 1
+        return out
+
+    train_idx = take_balanced([i for i, g in enumerate(groups) if g in train_set], n_train)
+    test_idx = take_balanced([i for i, g in enumerate(groups) if g not in train_set], n_test)
+
+    def hard_balance(idxs):
+        """The sycophantic class is the scarcer one (one syc row per wrong-claim prompt vs ~2
+        candid rows) — if the pool undershoots the target, trim the larger class so the split
+        stays exactly 50/50 rather than silently imbalanced."""
+        per = {0: [i for i in idxs if labels[i] == 0], 1: [i for i in idxs if labels[i] == 1]}
+        n = min(len(per[0]), len(per[1]))
+        if len(per[0]) != len(per[1]):
+            print(f"  (pool shortfall: balancing to {n} per class)")
+        return sorted(per[0][:n] + per[1][:n])
+
+    train_idx, test_idx = hard_balance(train_idx), hard_balance(test_idx)
+    train, test = (_syc_build(rows, labels, groups, ix) for ix in (train_idx, test_idx))
+    for name, s in (("train", train), ("test", test)):
+        neg_ga = [g for g, l in zip(s.extra["ga"], s.labels.tolist()) if l == 0]
+        print(f"Sycophancy {name}: {len(s)} ({int(s.labels.sum())} sycophantic) | "
+              f"GA share of negatives: {sum(neg_ga) / max(len(neg_ga), 1):.0%}")
+    return SycophancyData(train, test)
+
+
+def load_sycophancy_ood(n_per_class: int = 500) -> Split:
+    """OOD: the held-out math domain, balanced sample, same label mapping and mask policy."""
+    rows, labels, groups = _syc_gather((SYC_OOD_DOMAIN,))
+    order = np.random.RandomState(runtime.SEED).permutation(len(rows))
+    idxs, counts = [], {0: 0, 1: 0}
+    for i in order:
+        if counts[labels[i]] < n_per_class:
+            idxs.append(int(i)); counts[labels[i]] += 1
+    out = _syc_build(rows, labels, groups, idxs)
+    print(f"Sycophancy OOD ({SYC_OOD_DOMAIN}): {len(out)} examples ({int(out.labels.sum())} sycophantic)")
+    return out

@@ -9,8 +9,10 @@ from __future__ import annotations
 
 import numpy as np
 
+from concurrent.futures import ThreadPoolExecutor
+
 from .judge import get_client, judge_generation
-from .steering import SteeringHook, generate_steered, nie_baseline_gap, readout_pdiff
+from .steering import SteeringHook, generate_steered_batch, nie_baseline_gap, readout_pdiff
 
 
 def steering_nie_llm_evaluation(spec, dirs, prompt_texts, readout_texts, pos_readout_texts, coefs):
@@ -35,12 +37,16 @@ def steering_nie_llm_evaluation(spec, dirs, prompt_texts, readout_texts, pos_rea
     judge_on = get_client() is not None  # False => judge deliberately skipped (no key); NaN expected, not a failure
 
     def judged_generations(hook, label):
+        if not prompt_texts or not judge_on:      # nothing to generate/judge (deliberate skips)
+            return (np.nan, np.nan)
+        # (#52b) batch-generate on the GPU, then judge the batch with parallel API calls —
+        # replaces the interleaved one-at-a-time loop (GPU idled during every judge round-trip).
+        gens = generate_steered_batch(prompt_texts, hook)
         beh, coh = [], []
-        for pt in prompt_texts:
-            gen = generate_steered(pt, hook)
-            j = judge_generation(spec, pt, gen)
-            if j:
-                beh.append(j["behaviour"]); coh.append(j["coherence"])
+        with ThreadPoolExecutor(max_workers=8) as ex:
+            for j in ex.map(lambda pg: judge_generation(spec, pg[0], pg[1]), zip(prompt_texts, gens)):
+                if j:
+                    beh.append(j["behaviour"]); coh.append(j["coherence"])
         n_ok, n_req = len(beh), len(prompt_texts)
         if judge_on and n_req:  # only police failures when judging was actually requested (#46)
             if n_ok == 0:

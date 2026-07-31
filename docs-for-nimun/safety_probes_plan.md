@@ -339,8 +339,9 @@ preferred over Apollo-fidelity: stratified sampling (fixed tokens per prompt) �
 `MM (mean)` stays a closed-form pooled diff-of-means (no paper trains MM per-token, and the class means
 are ~identical either way); last-token probes use the last masked token.
 
-Secondary comparison (locked 2026-06-30): same grid on **concatenated** pooled features over the
-steering block (attention probe stacks the layers).
+~~Secondary comparison (locked 2026-06-30): same grid on **concatenated** pooled features over the
+steering block (attention probe stacks the layers).~~ **Struck 2026-07-30 (#51)** — never
+implemented, formally dropped.
 
 **Metrics** — every (probe × dataset), ID train/test and OOD, one table per behaviour:
 - **AUROC** (positive vs negative within dataset) — [Apollo §3.3 task 1], [HS §3]
@@ -1380,6 +1381,17 @@ and the papers. Newest entries appended at the bottom. All decisions confirmed b
    own gap units; readout-only (no judge/tax axis) and explicitly a PILOT per `compose_steering`'s
    research-grade flag — the validated three-behaviour version becomes the headline figure after
    sycophancy. Same-sign sweep only for now; mixed-sign combinations deferred.
+50. **ROC curves: solid lines, full opacity; retina config added to every plotting notebook**
+   (user decisions 2026-07-30, found at first §5.i execution on the new instance). The old
+   `alpha=0.7` translucency was removed; a dashed-linestyle variant (to interleave coincident
+   near-ceiling curves) was tried and **rejected by the user** — final state is plain solid lines,
+   with the known limit documented in the code: on ceiling eval sets the last-drawn probe covers
+   the others, so per-probe values are read from the legend/table there. Blurriness root cause:
+   M15's `%config InlineBackend.figure_format = "retina"` pairing was documented in
+   `_use_style()`'s comment but never added to any notebook — now present in both behaviour
+   notebooks' import cells and `comparison.ipynb` (which also gained the shared DPI rcParams;
+   `judge_validation` has no figures). All six matplotlib figure builders in `viz.py` were audited
+   as already calling `_use_style()`. Visualization-only; no numbers change.
 49. **Deception OOD pool: keep the concatenated pool for the run; macro-average deferred to
    post-run** (discussion 2026-07-30). The "Deception OOD pool" column (`cat_pack`, #35) computes a
    *pooled* AUROC over the union of AI Liar + Roleplaying — which includes cross-set rank
@@ -1394,6 +1406,66 @@ and the papers. Newest entries appended at the bottom. All decisions confirmed b
    re-run); if a single summary number is needed in the draft, quote the macro-average of the two
    AUROCs. Caveat if a macro-average row is added later: TPR@1%FPR cannot macro-average (AI Liar's
    is NaN by design, #35) and stays per-set.
+51. **Secondary concatenated-features comparison struck** (user decision 2026-07-30). The
+   2026-06-30 lock ("same grid on concatenated pooled features over the steering block") was
+   discovered in the decisions-provenance sweep to have **never been implemented** in any notebook
+   or module — no result ever depended on it. Dropped rather than built: the per-layer steering
+   block already carries the multi-layer story, and the probe grid is at its readability limit.
+   The Pipeline-stages line is struck in place with a pointer here.
+52. **GPU-utilization fixes — (a) and (c) IMPLEMENTED 2026-07-30 (user decision: fix after
+   deception finished, BEFORE the high-stakes run); (b) deferred.** Found when §7b took ~3 h on
+   the new instance (~37 min/layer vs the old box's ~2): `train_attention_probe` ran full-batch on
+   CPU (inherited verbatim from [NB] §5 via the audited notebook — same behaviour there, #42b
+   documented the GPU-at-0% symptom); the bottleneck is the per-epoch fp16→fp32 conversion of the
+   whole activation tensor — memory-bound, so the 128 cores don't help (kernel observed at ~360%
+   CPU, no thread cap, torch at 64 threads). The old 3090 box was faster **for this step** because
+   per-core speed/bandwidth beat core count.
+   (a) **Implemented: GPU-chunked full-batch training.** NOT minibatch SGD — chunks accumulate
+   gradients and the optimizer steps once per epoch, so the per-epoch gradient equals the old
+   full-batch gradient and the AdamW trajectory is preserved; init stays on the CPU RNG so seeds
+   mean the same probes. **Verified equivalent on synthetic data: W_q/W_out cosine 1.000000 vs the
+   old algorithm, identical AUROC, both seeds tested.** Probe returned on CPU as before (all
+   consumers unaffected); CPU fallback kept. Benchmark at HS scale: ~11 min/layer → **~1 h for the
+   whole 5-layer `build_directions`** (was heading for ~10 h). Parity note: **deception ran
+   entirely on the old code path** (fully audited-comparable); high-stakes attention numbers are
+   expected to match the audited math to float precision given the cosine-1.0 equivalence.
+   (c) **Implemented: extraction batch_size 8 → 16** (was sized for the 24 GB card; content-blind
+   cache keys unaffected).
+   (b) **Implemented 2026-07-30 (user approval; edits made during the deception run with explicit
+   authorization — running kernel unaffected, in-memory code):** new `generate_steered_batch`
+   (steering.py) — greedy batched generation, prompts LEFT-padded per batch with `padding_side`
+   flipped locally and restored (runtime pins "right" for mask paths); pad positions are
+   attention-masked so steered pad values never reach real tokens. `steering_nie_llm_evaluation`
+   now batch-generates each point then judges with **8 parallel API threads** (was: interleaved
+   one-at-a-time, GPU idle during every judge round-trip). Also: when the judge is off, generation
+   is now skipped entirely (was: generated then discarded). All guard semantics verified intact by
+   mocked tests: #46 empty-prompts skip, judge-off NaN, #38 shortfall warning + 0/N RuntimeError;
+   concurrency measured at 8; padding mechanics verified tokenizer-only (no second model loaded
+   next to the live run). `generate_steered` (single) kept unchanged for `show_qualitative`, the
+   UI, and `judge_validation`. Caveat recorded: batch padding can shift decode float-order →
+   generations may differ slightly in wording from the single path; the judge has no cross-run
+   comparability requirement (#44/#47), and the first judged high-stakes cell doubles as the live
+   check under fail-loud. Expected effect: judged eval cells ~40 min → ~10–12 min per eval set.
+   Per-token LR and the LR CV overlay stay CPU (minutes-scale).
+53. **Sycophancy (behaviour 3) BUILT — awaiting review + first run** (2026-07-31, user instruction;
+   full spec in `sycophancy_plan.md` v2, all five design decisions user-approved 2026-07-30).
+   Built while the deception run continued — additions are new files / purely additive package
+   code, nothing a running kernel imports changed. Deliverables: `data/sycophancy/` (5 factorial
+   files vendored from `cincynlp/disentangle-sycophancy` @ `217b8980`, SHA-256s + license-absent
+   caveat in PROVENANCE.md); `datasets.load_sycophancy`/`load_sycophancy_ood` + helpers (label
+   mapping per sycophancy_plan §3, incl. the mandatory genuine-agreement hard negatives;
+   pair-aware split by prompt group; hard class-balancing after a measured pool shortfall —
+   **1,368/class train, 347/class test**, not the targeted 1,500/500; sizes ACCEPTED by user
+   2026-07-31); `SYCOPHANCY_SPEC` in `behaviours.py` (decided readout + rubric wordings);
+   `notebooks/sycophancy.ipynb` (39 cells, the shared §1–8 skeleton, EDIT-HERE cells marked
+   "first run: suggestion = selection", plus a new **anti-echo-shortcut check** in §5.i —
+   sycophantic-vs-GA-only AUROC, ~0.5 = echo detector). Verified without GPU: loaders (balance,
+   pair integrity, mask alignment vs extraction tokenization, prompt distinctness), package
+   imports, notebook parses. NOT yet done: the run itself; `BEHAVIOURS += ["sycophancy"]` in
+   comparison.ipynb and the judge_validation extension (both post-run); data_reference.md
+   sycophancy section with templated pulls (at run time, per #32). Sequencing note: built before
+   the parity gate banked, per explicit user instruction — the sycophancy RUN still waits for
+   deception + high-stakes to finish.
 
 ## Verification
 
