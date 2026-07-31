@@ -1,0 +1,11 @@
+probe,eval,AUROC,TPR@1%FPR
+MM (last),test (ID),"0.867 [0.84,0.89]",0.308
+MM (last),anthropic_hh_balanced (OOD),"0.678 [0.66,0.70]",0.058
+MM (mean),test (ID),"0.951 [0.94,0.96]",0.372
+MM (mean),anthropic_hh_balanced (OOD),"0.699 [0.68,0.72]",0.031
+LR (last),test (ID),"0.977 [0.97,0.98]",0.688
+LR (last),anthropic_hh_balanced (OOD),"0.782 [0.77,0.80]",0.128
+LR (mean),test (ID),"0.995 [0.99,1.00]",0.828
+LR (mean),anthropic_hh_balanced (OOD),"0.826 [0.81,0.84]",0.080
+LR-attention,test (ID),"0.997 [0.99,1.00]",0.948
+LR-attention,anthropic_hh_balanced (OOD),"0.808 [0.79,0.82]",0.080
