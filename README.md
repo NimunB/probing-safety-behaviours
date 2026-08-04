@@ -1,13 +1,20 @@
 # safety_probes
 
-Linear probes for safety-relevant behaviours — **deception** and **high-stakes** detection, plus
-causal validation by steering. MSc thesis code, extracted from
-`safety_probes.ipynb` so it no longer depends on the ARENA course repo.
+Linear probes for safety-relevant behaviours in Llama-3.1-8B-Instruct, and calibrated activation
+steering along the same directions. MSc thesis code.
 
-**Headline hypothesis:** [Apollo App. D.1] found LR is the best *detector* of deception;
-[GoT Table 2] found MM directions are the most *causal* (best NIE in 7/8 conditions) despite
-similar classification accuracy. Does this read/write dissociation hold across safety
-behaviours with different ontologies?
+The question the repo is built around: **when you find a linear direction for a safety behaviour, is
+the direction that best *detects* the behaviour also the one that best *steers* it?** Prior work
+answers those two halves separately and on different properties. [Apollo App. D.1] finds logistic
+regression the best *detector* of deception; [GoT Table 2] finds difference-of-means directions the
+most *causal* (best NIE in 7 of 8 conditions) despite comparable classification accuracy. Read
+together that implies a **read/write dissociation**, but nobody tests it in one pipeline, so the
+apparent effect could just be an artefact of differing models, metrics and token policies. This repo
+holds everything else fixed and measures both sides on the same activations.
+
+Three behaviours are implemented: **deception**, **high-stakes awareness**, and **sycophancy**. The
+answer turns out to depend on which: the dissociation replicates on the first two and inverts on the
+third.
 
 Sources: **[GoT]** Marks & Tegmark, *The Geometry of Truth* · **[Apollo]** Goldowsky-Dill et al.,
 *Detecting Strategic Deception Using Linear Probes* · **[HS]** McKenzie et al., *Detecting
@@ -16,165 +23,143 @@ Contrastive Activation Addition* · **[NB]** the ARENA `1.3.1_Linear_Probes` exe
 
 ---
 
-## Setup on a fresh Vast.ai instance
+## What's in here
 
-The base Vast image ships Python 3.11, `uv`, and a default venv at `/venv/main`. **A venv is
-enough — conda is not needed** (bitsandbytes/torch install fine from wheels). Steps:
+```
+safety_probes/          the pipeline as an importable package (~2,900 lines)
+  behaviours.py           the three BehaviourSpecs — the only behaviour-specific code
+  spec.py                 the BehaviourSpec dataclass
+  runtime.py              model/tokenizer/device/config; replaces notebook globals
+  chat.py                 chat templating + detection masks (see "load-bearing", below)
+  datasets.py             loaders for all three behaviours and their OOD sets
+  extraction.py           activation extraction + the disk cache
+  probes.py               MMProbe, LRProbe, AttentionProbe
+  metrics.py              the probe grid, AUROC/TPR, pair-aware CV layer sweep
+  steering.py             the whole write side: hooks, calibration, NIE readout, block selection
+  judge.py                the LLM judge (behaviour + coherence)
+  evaluation.py           couples steering to the judge
+  viz.py, export.py, summary.py
+
+notebooks/              one driver per behaviour, plus a cross-behaviour comparison
+ui_probe.py             interactive scoring + steering over the exported bundles
+data/                   vendored and pinned inputs
+exported_probes/        frozen probes, directions and result tables from the last run
+research-report/        the thesis report (LaTeX), its figures, and a table generator
+docs-for-nimun/         the decision record, data reference, and the source papers
+```
+
+Adding a behaviour means writing one `BehaviourSpec` and one loader. Nothing downstream is
+conditioned on which behaviour is running, which is what makes the three comparable.
+
+## How the pipeline works
+
+Each behaviour flows through the same stages, with the read and write sides diverging after
+extraction:
+
+1. **Mask.** Decide which tokens the probe may see. The rule is *mask where the label lives*:
+   assistant content only for deception and sycophancy (their system prompts state or imply the
+   label), every role's message content for high-stakes (the danger can be stated by anyone).
+2. **Extract.** One forward pass per batch keeps all 32 layers, pooled two ways (`mean` and `last`)
+   and cached as fp16. This is what makes a full layer sweep cheap.
+3. **Select a layer, twice.** Detection layer by pair-aware 5-fold cross-validated AUROC on the
+   training split. Steering block by a causal sweep: compute the NIE at every layer, take the
+   contiguous five-layer window with the largest summed effect. The two rarely coincide.
+4. **Probe grid.** Five cells crossing estimator (mass-mean, logistic regression) with pooling
+   (last, mean, learned attention), so a difference can be attributed to one axis rather than both.
+5. **Steer.** Refit directions per block layer, calibrate so coefficient 1.0 crosses the class-mean
+   gap, then measure two ways: the **NIE** on a constrained YES/NO readout, and an **LLM judge**
+   scoring generated text for the behaviour *and*, separately, for coherence. The coherence axis
+   exists because a readout metric cannot tell "induced the behaviour" from "broke the model".
+
+## Results at a glance
+
+Best out-of-distribution detector, and best steerer, per behaviour:
+
+| | Deception | High-stakes | Sycophancy |
+|---|---|---|---|
+| Detection layer / steering block | 12 / 15–19 | 13 / 8–12 | 19 / 5–9 |
+| Best OOD detector | LR (mean) 0.722 | LR (mean) 0.826 | **MM (last) 0.879** |
+| Best steerer (NIE) | MM | MM | **LR-attention** |
+| Read/write dissociation | holds | holds | **inverts** |
+
+Full tables are in `exported_probes/*.csv` and in the report's appendices, which are generated from
+those files by `research-report/make_appendix_tables.py`.
+
+## The interactive interface
+
+`ui_probe.py` serves the exported probes and directions over a small local web app: paste text and
+score it with any probe in the grid, or steer generation with any direction at a chosen coefficient.
+It computes everything live from your input and stores no activations. It shares `chat.py` and
+`export.py` with the pipeline, so what it scores is what the notebooks scored.
+
+---
+
+## Setup
 
 ```bash
-# 0. Clone the repo (or copy this folder over) and cd into it
-cd probing-safety-behaviours
-
-# 1. Make an isolated venv. Either reuse /venv/main, or create a dedicated one:
+# 1. Isolated venv (or reuse /venv/main).
 python -m venv /venv/safety && source /venv/safety/bin/activate
-#   (uv works too: uv venv /venv/safety && source /venv/safety/bin/activate)
 
-# 2. Install torch FIRST, from the CUDA index that matches the GPU, THEN the rest.
-#    cu128 is what the audited results used; a Blackwell card (RTX 50xx/B200) needs cu128+.
-uv pip install torch==2.11.0 --index-url https://download.pytorch.org/whl/cu128
-uv pip install -r requirements.txt
+# 2. Install torch FIRST from the CUDA index matching the GPU, THEN the rest.
+#    A Blackwell card (RTX 50xx / B200) needs cu128 or newer.
+pip install torch --index-url https://download.pytorch.org/whl/cu128
+pip install -r requirements.txt
 
-# 3. Make `safety_probes` importable from anywhere (the notebooks live in notebooks/, and a
-#    VSCode kernel's cwd is the workspace root — either way `import safety_probes` fails without
-#    this). One editable install fixes it for every notebook, the UI, and any cwd:
-uv pip install -e .
+# 3. Make the package importable from any cwd (notebooks live in notebooks/,
+#    but a VSCode kernel's cwd is the workspace root).
+pip install -e .
 
-# 4. circuitsvis installs as 0.0.0 from PyPI's default in some setups — if the heatmap cells
-#    error, install a real release explicitly (needed for the notebook heatmaps, NOT the UI):
-uv pip install "circuitsvis>=1.43"
+# 4. circuitsvis sometimes resolves to 0.0.0; if the notebook heatmap cells error,
+#    pin a real release. Not needed for the UI.
+pip install 'circuitsvis>=1.43'
 
-# 5. Secrets: create .env next to this README (gitignored). HF_TOKEN is REQUIRED (gated Llama
-#    repo → 401 without it); ANTHROPIC_API_KEY is optional (judge cells skip cleanly if absent).
-printf 'HF_TOKEN=hf_xxx\nANTHROPIC_API_KEY=sk-ant-xxx\n' > .env
+# 5. Secrets in .env next to this README (gitignored).
+#    HF_TOKEN is REQUIRED (gated Llama repo, 401 without it).
+#    ANTHROPIC_API_KEY is optional; judge cells skip cleanly and leave NaN columns.
 
-# 6. Sanity check — imports clean and finds the .env, without loading the model:
-python -c "import safety_probes; print('ok')"
+# 6. Sanity check, without loading the model:
+python -c "from safety_probes import runtime; runtime.load_env(); print('ok')"
 ```
 
-**Is `requirements.txt` sufficient?** Yes for both the UI and the parity run — it now includes
-`fastapi`/`uvicorn` (UI) and `circuitsvis` (heatmaps). Two things it deliberately does *not* pin:
-the model weights (re-downloaded from HF on first `runtime.init()`, ~15 GB, needs `HF_TOKEN`), and
-`scipy` (only the optional judge-validation step). Provision the instance with **≥120 GB disk** and
-**a volume** so the weights + caches survive a recycle.
+## Running it
 
-**Do NOT `pip install gradio`** — it force-downgrades `starlette`/`pydantic` or breaks
-`huggingface_hub` for `transformers`. The UI is FastAPI for exactly this reason (plan M9).
+**The behaviour notebooks.** Run `notebooks/deception.ipynb`, `high_stakes.ipynb` and
+`sycophancy.ipynb` top to bottom; each loads the model once and ends by exporting its bundle. Two
+cells per notebook are marked `EDIT HERE`: the detection layer and the steering block both default to
+`argmax` / `pick_block`, and pinning them to the recorded values reproduces the exported bundles
+exactly. `notebooks/comparison.ipynb` runs GPU-free from the exported JSON.
+
+**The UI.** Free the GPU first: the 8-bit 8B needs roughly 19 GB, so shut down any notebook kernel
+still holding the model, then
+
+```bash
+source /venv/main/bin/activate && python ui_probe.py     # binds 127.0.0.1:17860
+```
+
+Expect a quiet minute or two while Llama loads. It binds to localhost and adds no network exposure
+by itself; reach it with an SSH tunnel
+
+```bash
+ssh -p <ssh-port> -L 8080:127.0.0.1:17860 root@<host>   # then open localhost:8080
+```
+
+or, on a Vast.ai box, by adding an entry to `/etc/portal.yaml` on a free reserved port and
+restarting Caddy, which puts it behind token auth. Read the port and IP from the instance shell;
+they change with every instance.
+
+**The report.** `cd research-report && latexmk -pdf report_v3.tex`. Appendices A and B are generated:
+re-run `make_appendix_tables.py` after any pipeline run so the tables cannot drift from
+`exported_probes/`.
 
 ---
 
-## Running the UI
+## Design notes worth knowing
 
-Interactive detection + steering over the exported probe bundles. Loads the model once; computes
-everything live from your input (no activations stored).
-
-**1. Free the GPU.** The 8-bit 8B needs ~19 GB of a 24 GB card. If a notebook kernel still holds
-the model, the UI will OOM — shut the kernel down first, then confirm:
-
-```bash
-nvidia-smi --query-gpu=memory.free --format=csv,noheader     # want >= 20000 MiB
-```
-
-**2. Start the server** (binds `127.0.0.1:17860`; adds no network exposure by itself):
-
-```bash
-cd probing-safety-behaviours
-source /venv/main/bin/activate && python ui_probe.py   # venv name varies per instance; /venv/main on the current box
-```
-
-Expect `env: .../.env`, then a warning if `HF_HOME` points at the wrong cache (it auto-corrects —
-see below), then a quiet minute or two while Llama loads, then `Serving on http://127.0.0.1:17860`.
-
-**3. Reach it.** It's on localhost, so pick one:
-
-*SSH tunnel (simplest; nothing public, no token):* from your own machine,
-```bash
-ssh -p $VAST_TCP_PORT_22 -L 8080:127.0.0.1:17860 root@$PUBLIC_IPADDR
-# then open http://localhost:8080
-```
-On Vast, `$VAST_TCP_PORT_22` and `$PUBLIC_IPADDR` are set in the instance shell — read them there
-(current box, 2026-07: port 16195, IP 89.221.67.172 — these change with every new instance; read
-them from the instance shell, never from this README).
-
-*Caddy (shareable URL + token auth), on a reserved free port:*
-```bash
-python -c "import yaml; d=yaml.safe_load(open('/etc/portal.yaml')) or {'applications':{}}; \
-d['applications']['Safety Probes']={'hostname':'localhost','external_port':10100, \
-'internal_port':17860,'open_path':'/','name':'Safety Probes'}; \
-yaml.safe_dump(d, open('/etc/portal.yaml','w'), sort_keys=False)"
-supervisorctl restart caddy
-# reachable at $PUBLIC_IPADDR:$VAST_TCP_PORT_10100 with $OPEN_BUTTON_TOKEN
-```
-
-### Two Vast gotchas the code now handles for you
-
-* **`.env`** — `runtime.init()` searches `$SAFETY_PROBES_ENV` → `<repo>/.env` → each parent dir, so
-  it finds `exercises/.env` today and a repo-local `.env` once standalone. Missing `HF_TOKEN` fails
-  loudly (gated Llama repo → 401), not with a wall of traceback.
-* **`HF_HOME`** — Vast sets `HF_HOME=${WORKSPACE}/.hf_home`, but the weights may live at
-  `/root/.cache/huggingface`. `runtime.init()` picks whichever cache actually holds the model and
-  warns if that isn't `$HF_HOME`, so it will **not** silently re-download 15 GB.
-
----
-
-## Extraction status — COMPLETE, pending the parity run
-
-Every function/class in `safety_probes.ipynb` is now either in the `safety_probes` package or a
-driver-local helper in a notebook. Full-package AST audit: **56/56 shared definitions faithful** to
-the notebook (49 byte-identical after mechanical `runtime.` substitutions; 7 cosmetic — type
-annotations, context-manager methods, import placement). The three `notebooks/` orchestrate the
-pipeline by importing the package.
-
-**What's left is the parity RUN** — execute `notebooks/deception.ipynb` and `high_stakes.ipynb` on
-the GPU and confirm the numbers match the audited notebook: detection layer **12 / 20**, the grid
-AUROCs, steering block **[15-19] / [9-13]**, the NIE curves. Until that passes,
-`safety_probes.ipynb` remains the source of truth. A refactor that moves a number is a bug.
-(`summary.ipynb` was dissolved 2026-07-30, plan #45 — each notebook now computes its own probing
-verdict at the end of its probing section and steering verdict at the end of its steering section.)
-
-| Module | Status | Contents |
-|---|---|---|
-| `runtime.py` | ✅ | model/tokenizer/device/config + env & HF-cache resolution; replaces notebook globals |
-| `chat.py` | ✅ | **the ARENA cut** — vendored `build_detection_mask`, `clean_bpe_token`, + the 3 chat helpers |
-| `probes.py` | ✅ | `MMProbe`, `LRProbe`, `AttentionProbe`, `train_attention_probe` |
-| `extraction.py` | ✅ | cache + pooled/full-sequence extractors |
-| `spec.py` | ✅ written | `BehaviourSpec` |
-| `export.py` | ✅ written | `export_behaviour`, `load_behaviour`, `rebuild_detection_probe` |
-| `metrics.py` | ✅ written, unit-tested | grid training, `probe_scores`, `evaluate_grid`, `bootstrap_auroc`, `tpr_at_fpr`, `cv_auroc_by_layer` |
-| `datasets.py` | ✅ written, helpers unit-tested | deception pairs, AI Liar, Roleplaying, MUP high-stakes + OOD loaders |
-| `steering.py` | ✅ AST-verified | full WRITE side: `SteeringHook`, `calibrate`, `generate_steered`, `compose_steering`, `readout_pdiff`, `nie_baseline_gap`, `nie_layer_sweep`, `pick_block`, `build_directions`, `calibrate_block` |
-| `judge.py` | ✅ AST-verified | Claude judge (`enum` fix #44), lazy client |
-| `evaluation.py` | ✅ AST-verified | `steering_nie_llm_evaluation` (steering × judge) |
-| `viz.py` | ✅ AST-verified | heatmaps, PCA panel, ROC, steering plots, cosine matrix + vendored ARENA viz utils |
-| `summary.py` | ✅ | verdict helpers `auroc_pivot` / `nie_at` + CSV persistence of final numbers (verdict cells live in the behaviour notebooks, plan #45) |
-| `notebooks/` | ✅ built | `deception.ipynb` (§2), `high_stakes.ipynb` (§3) — per-behaviour verdicts inline; `summary.ipynb` removed 2026-07-30; `comparison.ipynb` (plan #48) — cross-behaviour steering overlays (GPU-free, from `exported_probes/*_steering_full.json`) + drafted simultaneous-steering experiment |
-
-`ui_probe.py` now imports the loaders from `safety_probes.export` (the duplication is gone).
-
-### Running the parity check
-
-```bash
-# free the GPU first (see § Running the UI), then run in order:
-jupyter nbconvert --to notebook --execute notebooks/deception.ipynb --output deception.ipynb
-jupyter nbconvert --to notebook --execute notebooks/high_stakes.ipynb --output high_stakes.ipynb
-```
-
-Or run them interactively. Compare against the audited `safety_probes.ipynb`: **detection layer
-12 / 20**, the grid AUROC tables, **steering block [15-19] / [9-13]**, the NIE dose-response. The two
-EDIT-HERE points default to `argmax` / `pick_block`; pin them to the audited values to reproduce the
-exported bundles byte-for-byte. `circuitsvis` must be installed for the heatmap cells (see
-requirements.txt).
-
----
-
-## The one design decision worth knowing
-
-The notebook keeps `model`, `tokenizer`, `SEED`, `MODEL_NAME` as globals; modules can't. Rather
-than threading `model`/`tokenizer` through every signature — which would change nearly every
-function and make a diff against the audited notebook unreadable — shared state lives in
-`runtime.py` and other modules read `runtime.model` / `runtime.tokenizer`.
-
-**Consequence: `runtime.init()` must be called once before anything touches the model.** The
-accessors raise a clear error rather than an `AttributeError` if you forget.
+**`runtime.init()` must be called before anything touches the model.** The notebook kept `model`,
+`tokenizer`, `SEED` and `MODEL_NAME` as globals and modules cannot. Rather than thread
+`model`/`tokenizer` through every signature, shared state lives in `runtime.py` and other modules
+read `runtime.model` / `runtime.tokenizer`. The accessors raise a clear error rather than an
+`AttributeError` if you forget.
 
 ```python
 from safety_probes import runtime, chat
@@ -182,57 +167,37 @@ runtime.init()                       # loads Llama-3.1-8B-Instruct in 8-bit
 text, mask = chat.chat_with_assistant_mask(messages)
 ```
 
-## Why `chat.py` is load-bearing
+**`chat.py` is load-bearing.** Every activation a probe sees is indexed by a mask built there. If
+templating and masking disagree by one token, every probe score is computed on the wrong activations,
+silently — that was the double-BOS defect. Any consumer, the UI included, must tokenize through these
+helpers rather than calling `apply_chat_template` directly. `build_detection_mask` is vendored
+verbatim from [NB], double-BOS quirk included, with the strip-fix in the caller; fixing it at source
+would invalidate the line-by-line audit and every cached activation, so revisit only with a cache
+wipe and a full re-run.
 
-Every activation the probes see is indexed by a mask built in `chat.py`. If templating and
-masking disagree by one token, every probe score is computed on the wrong activations —
-silently. That was the double-BOS bug (plan #22). **Any consumer, including the UI, must
-tokenize through these helpers** rather than calling `apply_chat_template` directly.
+**The activation cache is content-blind.** Its key is `(kind, model, name, n_examples, max_length)`,
+so editing a loader without changing `name` or the example count silently serves stale activations.
+Delete the matching `activation_cache/*.pt` after any loader change.
 
-`build_detection_mask` is vendored **verbatim**, double-BOS quirk included, with the strip-fix
-left in the caller where the notebook has it. We now own the code and *could* fix it at source,
-but that would invalidate the line-by-line audit and every cached activation. Revisit only with
-a cache wipe and a full re-run.
+**Data is vendored and pinned.** `data/` holds the Apollo files (500 KB) frozen at a recorded commit,
+with SHA-256 digests in [`data/PROVENANCE.md`](data/PROVENANCE.md). Upstream is 535 MB for the same
+files and was unpinned, so an upstream edit would have silently changed the thesis's inputs, and the
+content-blind cache would not have noticed. `Arrrlex/models-under-pressure` stays a HuggingFace fetch
+pinned by `MUP_REVISION`. `data/` and `exported_probes/` are deliberately not gitignored;
+`activation_cache/` is.
 
-## Data is vendored and pinned
+**Environment quirks handled for you.** `runtime.init()` searches `$SAFETY_PROBES_ENV` →
+`<repo>/.env` → parent directories for the env file, and fails loudly on a missing `HF_TOKEN` rather
+than with a 401 traceback. It also picks whichever HuggingFace cache actually holds the weights and
+warns if that isn't `$HF_HOME`, so it will not silently re-download 15 GB.
 
-`data/` holds the three Apollo files (500 KB) frozen at commit `f8ec4010`, with SHA-256 digests in
-[`data/PROVENANCE.md`](data/PROVENANCE.md). The upstream repo is 535 MB for those same three files
-and was **unpinned** — an upstream edit would have silently changed the thesis's data, and the
-content-blind cache would not have recomputed.
+## Documentation
 
-`Arrrlex/models-under-pressure` stays a HuggingFace fetch but is pinned via `MUP_REVISION`.
-
-`data/` and `exported_probes/` are deliberately **not** gitignored; `activation_cache/` and the
-fallback clone are.
-
-## Cache caveat (carried over deliberately)
-
-The activation-cache key is `(kind, model, name, n_examples, max_length)` — **content-blind**.
-Edit a loader without changing `name` or the example count and the cache silently serves stale
-activations. After editing any loader, delete the matching `activation_cache/*.pt`.
-
----
-
-## Remaining Phase 1 work
-
-1. Extract `datasets.py`, `metrics.py`, `steering.py`, `judge.py`, `viz.py`.
-2. Build `notebooks/deception.ipynb` and `notebooks/high_stakes.ipynb` importing from the package.
-3. **Parity run** — execute both notebooks here and confirm the numbers match the audited
-   notebook. Same detection layer, same AUROCs, same steering block. This is the gate; a
-   refactor that changes a number is a bug, not a refactor.
-4. Push as its own repo, then migrate to a fresh instance with a volume.
-
-## Known gap: figures don't render on GitHub
-
-Plotly output is stored as `application/vnd.plotly.v1+json` (GitHub can't render it) and the
-heatmaps are inline-styled HTML (GitHub strips `style` attributes, so they lose all colour).
-There is no `image/png` anywhere in the notebook as a fallback. Options: view via **nbviewer**
-(zero code change), or install `kaleido` and emit a PNG alongside each figure. Worth doing when
-the plotting call sites move into `viz.py` rather than retrofitting later.
-
-## Environment
-
-Originally developed on a Vast.ai RTX 3090 (24 GB), `/venv/arena-env`; since 2026-07-30 running on
-an RTX 5090 (32 GB), `/venv/main`, torch 2.12+cu130 (see plan "Status — 2026-07-30").
-See `requirements.txt` — install torch from the CUDA index first.
+- [`docs-for-nimun/safety_probes_plan.md`](docs-for-nimun/safety_probes_plan.md) — the decision
+  record: every numbered revision, what changed and why.
+- [`docs-for-nimun/data_reference.md`](docs-for-nimun/data_reference.md) — for each behaviour, the
+  exact prompts with probed tokens highlighted and steered tokens marked. Every block is a real pull
+  from the seed-42 splits.
+- [`docs-for-nimun/sycophancy_plan.md`](docs-for-nimun/sycophancy_plan.md) — the third behaviour's
+  design, including its genuine-agreement control.
+- [`docs-for-nimun/papers/`](docs-for-nimun/papers/) — the four source papers.

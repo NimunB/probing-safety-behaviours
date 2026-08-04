@@ -8,6 +8,7 @@
 \usepackage{xcolor}
 \usepackage{booktabs}
 \usepackage{url}
+\usepackage[hidelinks]{hyperref} % must be loaded last (after cite/url) for IEEEtran
 
 % Draft placeholder for numbers not yet produced (first run pending on the GPU box).
 \newcommand{\TODO}[1]{\textcolor{red}{[\textbf{TODO:} #1]}}
@@ -20,9 +21,7 @@
 \title{Probing and Steering for Safety-Relevant Behaviours 
 in Large Language Models}
 
-\author{\IEEEauthorblockN{Nimun Kaur Bajwa\thanks{Draft manuscript. Empirical
-results marked in \textcolor{blue}{blue} are placeholders pending the first full
-experimental run; methodology is frozen.}}
+\author{\IEEEauthorblockN{Nimun Kaur Bajwa}
 \IEEEauthorblockA{\textit{MSc. Artificial Intelligence}, Queen Mary University of London\\
 {n.k.bajwa@se25.qmul.ac.uk}}}
 
@@ -116,6 +115,8 @@ safety behaviours rather than on truth.
   out-of-distribution evaluation, and calibrated steering, so results are
   comparable across behaviours and new behaviours are added as configuration.
 \end{itemize}
+
+Our code, datasets, and an interactive user interface are available at \url{https://github.com/NimunB/probing-safety-behaviours}.
 
 \section{Related Work}
 

@@ -38,13 +38,35 @@ from .probes import LRProbe, MMProbe, train_attention_probe
 from .spec import BehaviourSpec
 
 
-class SteeringHook:
-    """ADDS a per-layer steering vector at EVERY token position, over a set of layers.
+#: WHERE the steering vector is written, per instrument. Changed 2026-08-02 (was "all"/"all").
+#:
+#: "transcript" (readout): write ONLY to the item transcript's tokens, not to the few-shot
+#:   demonstrations and not to the trailing question. The demonstrations contain the literal
+#:   " YES"/" NO" tokens the NIE reads and the question asks for them, so steering them can move
+#:   the answer logits *without* changing how the transcript is represented — the measured NIE
+#:   would then be partly direct pressure on the instrument. [GoT §6.1] avoids exactly this by
+#:   confining the intervention to group (b) and excluding the readout position; this is that
+#:   design applied to a dialogue.
+#: "completion" (generation): write ONLY to generated tokens, leaving the system+user prompt
+#:   untouched. This is real [CAA §3.1]'s convention ("every token position of the generated text
+#:   after the end of the initial prompt"), which the previous every-token setting did not match.
+#:
+#: Set either to "all" to reproduce the pre-2026-08-02 numbers.
+STEER_SCOPE_READOUT = "transcript"     # "transcript" | "all"
+STEER_SCOPE_GENERATION = "completion"  # "completion" | "all"
 
-    Every-token application is the [CAA] convention and is deliberately uniform across methods so
-    coefficients mean the same thing for MM, LR, and LR-attention. Note that real CAA steers only
-    from the instruction end and [GoT] only from statement-end tokens — our uniform convention is
-    a disclosed deviation chosen for fairness between arms (plan #33).
+
+class SteeringHook:
+    """ADDS a per-layer steering vector to a set of layers, over a configurable token scope.
+
+    Scope is set by the *instrument*, not the caller: `readout_pdiff` narrows to the transcript
+    span and the generation helpers narrow to decode steps (see STEER_SCOPE_* above). The
+    defaults here are all-token, so `compose_steering`, `ui_probe.py` and any exported bundle
+    behave exactly as before unless a consumer opts in.
+
+    All-token application remains the convention *within* a scope, uniformly across MM, LR and
+    LR-attention, so a difference between arms can only come from the direction and never from one
+    method touching fewer tokens than another (plan #33).
 
     Use as a context manager, or call enable()/disable() explicitly:
 
@@ -52,9 +74,15 @@ class SteeringHook:
             out = model.generate(...)
     """
 
-    def __init__(self, layer_vectors: dict[int, Tensor], coef: float):
+    def __init__(self, layer_vectors: dict[int, Tensor], coef: float,
+                 positions: Tensor | None = None, completion_only: bool = False):
         self.layer_vectors = layer_vectors  # {layer: calibrated vector in raw activation space}
         self.coef = coef
+        #: [batch, seq] bool — True where the vector is written. None = every position.
+        #: Set per batch by `readout_pdiff`; the seq dim MUST match the forward pass.
+        self.positions = positions
+        #: True = skip prefill entirely, so only generated tokens are steered.
+        self.completion_only = completion_only
         self._handles = []
 
     def _make_fn(self, vec):
@@ -62,7 +90,21 @@ class SteeringHook:
 
         def fn(module, inp, output):
             hs = output[0] if isinstance(output, tuple) else output
-            hs = hs + self.coef * v.to(hs.dtype)
+            # Decode steps have seq len 1 (KV cache); prefill has the whole prompt.
+            is_prefill = hs.shape[1] != 1
+            if self.completion_only and is_prefill:
+                return output                      # prompt left exactly as the model saw it
+            add = self.coef * v.to(hs.dtype)
+            if self.positions is not None and is_prefill:
+                if self.positions.shape[1] != hs.shape[1]:
+                    # Fail loud (#38): silently steering everything is the defect this scope fixes.
+                    raise RuntimeError(
+                        f"SteeringHook.positions has seq={self.positions.shape[1]} but the forward "
+                        f"pass has seq={hs.shape[1]}. The mask must be rebuilt per batch.")
+                m = self.positions.to(hs.device).unsqueeze(-1).to(hs.dtype)
+                hs = hs + add * m
+            else:
+                hs = hs + add
             return (hs,) + output[1:] if isinstance(output, tuple) else hs
 
         return fn
@@ -123,19 +165,47 @@ def calibrate(direction: Tensor, mean_acts_layer: Tensor, labels: Tensor) -> Ten
     return d_hat * gap
 
 
+class _generation_scope:
+    """Apply STEER_SCOPE_GENERATION to a hook for the duration of a generate() call, then restore.
+
+    Hooks are reused across coefficients and by `nie_layer_sweep`, so the flag must not leak out of
+    the generation path — the readout must keep seeing an unmodified hook.
+    """
+
+    def __init__(self, hook):
+        self.hook, self.prev = hook, None
+
+    def __enter__(self):
+        if self.hook is not None:
+            self.prev = self.hook.completion_only
+            self.hook.completion_only = (STEER_SCOPE_GENERATION == "completion")
+        return self.hook
+
+    def __exit__(self, *exc):
+        if self.hook is not None:
+            self.hook.completion_only = self.prev
+        return False
+
+
 @t.no_grad()
 def generate_steered(prompt_text: str, hook: SteeringHook | None, max_new_tokens: int = 80) -> str:
     """Greedy generation with an optional steering hook active. Deterministic (do_sample=False),
-    so a coefficient of 0 reproduces the baseline exactly."""
+    so a coefficient of 0 reproduces the baseline exactly.
+
+    STEERING SCOPE (2026-08-02): under `STEER_SCOPE_GENERATION == "completion"` only generated
+    tokens are steered — the system+user prompt is left as the model saw it, matching real
+    [CAA §3.1]. Implemented by skipping the prefill pass (seq len > 1) inside the hook.
+    """
     model, tokenizer = runtime.get_model(), runtime.get_tokenizer()
     inp = tokenizer(prompt_text, return_tensors="pt", truncation=True, max_length=512).to(model.device)
-    handles = hook.enable() if hook is not None else []
-    try:
-        gen = model.generate(**inp, max_new_tokens=max_new_tokens, do_sample=False,
-                             pad_token_id=tokenizer.eos_token_id)
-    finally:
-        for h in handles:
-            h.remove()
+    with _generation_scope(hook):
+        handles = hook.enable() if hook is not None else []
+        try:
+            gen = model.generate(**inp, max_new_tokens=max_new_tokens, do_sample=False,
+                                 pad_token_id=tokenizer.eos_token_id)
+        finally:
+            for h in handles:
+                h.remove()
     return tokenizer.decode(gen[0][inp["input_ids"].shape[1]:], skip_special_tokens=True).strip()
 
 
@@ -147,28 +217,33 @@ def generate_steered_batch(prompt_texts: list[str], hook: SteeringHook | None,
     Same parameters as `generate_steered` (greedy, max_length=512 truncation, eos padding), but
     processes prompts in batches so the GPU is actually used. Prompts are LEFT-padded per batch so
     generation continues from the real last token; `padding_side` is flipped locally and restored
-    (runtime pins it "right" for the mask/indexing paths — do not change that global). Steering
-    still applies at every position; pad positions are attention-masked, so their steered values
-    never reach a real token. Caveat: batch padding can shift decode-side floating point, so
-    generations may differ slightly in wording from the one-at-a-time path — acceptable for the
-    judge, which has no cross-run comparability requirement (#44/#47)."""
+    (runtime pins it "right" for the mask/indexing paths — do not change that global). Caveat:
+    batch padding can shift decode-side floating point, so generations may differ slightly in
+    wording from the one-at-a-time path — acceptable for the judge, which has no cross-run
+    comparability requirement (#44/#47).
+
+    STEERING SCOPE (2026-08-02): as `generate_steered` — under
+    `STEER_SCOPE_GENERATION == "completion"` the prefill pass is skipped, so only generated tokens
+    are steered. That also removes the old left-padding concern entirely: pad positions live in the
+    prompt, which is no longer touched."""
     model, tokenizer = runtime.get_model(), runtime.get_tokenizer()
     out: list[str] = []
     old_side = tokenizer.padding_side
     tokenizer.padding_side = "left"
     try:
-        handles = hook.enable() if hook is not None else []
-        try:
-            for i in range(0, len(prompt_texts), batch_size):
-                inp = tokenizer(prompt_texts[i:i + batch_size], return_tensors="pt", padding=True,
-                                truncation=True, max_length=512).to(model.device)
-                gen = model.generate(**inp, max_new_tokens=max_new_tokens, do_sample=False,
-                                     pad_token_id=tokenizer.eos_token_id)
-                n_inp = inp["input_ids"].shape[1]
-                out.extend(tokenizer.decode(g[n_inp:], skip_special_tokens=True).strip() for g in gen)
-        finally:
-            for h in handles:
-                h.remove()
+        with _generation_scope(hook):
+            handles = hook.enable() if hook is not None else []
+            try:
+                for i in range(0, len(prompt_texts), batch_size):
+                    inp = tokenizer(prompt_texts[i:i + batch_size], return_tensors="pt", padding=True,
+                                    truncation=True, max_length=512).to(model.device)
+                    gen = model.generate(**inp, max_new_tokens=max_new_tokens, do_sample=False,
+                                         pad_token_id=tokenizer.eos_token_id)
+                    n_inp = inp["input_ids"].shape[1]
+                    out.extend(tokenizer.decode(g[n_inp:], skip_special_tokens=True).strip() for g in gen)
+            finally:
+                for h in handles:
+                    h.remove()
     finally:
         tokenizer.padding_side = old_side
     return out
@@ -191,6 +266,32 @@ def render_transcript(spec: BehaviourSpec, item_text: str) -> str:
     return f"Message: {item_text}\n"                   # high-stakes: raw user message
 
 
+def _transcript_char_spans(spec: BehaviourSpec, item_texts: list[str]) -> tuple[list[str], list[tuple[int, int]]]:
+    """Build the readout prompts and, for each, the [start, end) CHARACTER span of the item
+    transcript inside it. Computed by construction (not by searching the prompt) so it is exact:
+    the transcript sits at len(few_shot) + its offset within the rendered block."""
+    prompts, spans = [], []
+    base = len(spec.readout_few_shot)
+    for x in item_texts:
+        rendered = render_transcript(spec, x)
+        start = base + rendered.index(x)          # skips "Dialogue:\n" / "Message: " wrapper
+        prompts.append(spec.readout_few_shot + rendered + spec.readout_question)
+        spans.append((start, start + len(x)))
+    return prompts, spans
+
+
+def _span_mask(enc, spans: list[tuple[int, int]], seq_len: int) -> Tensor:
+    """[batch, seq] bool mask over the transcript tokens of each row, via char_to_token."""
+    mask = t.zeros(len(spans), seq_len, dtype=t.bool)
+    for j, (c0, c1) in enumerate(spans):
+        st = enc.char_to_token(j, c0)
+        if st is None:
+            continue                              # transcript truncated away entirely -> steer nothing
+        et = enc.char_to_token(j, c1 - 1)
+        mask[j, st:(et + 1) if et is not None else seq_len] = True
+    return mask
+
+
 @t.no_grad()
 def readout_pdiff(spec: BehaviourSpec, item_texts: list[str], steer_hook=None, batch_size=8) -> np.ndarray:
     """P(YES) - P(NO) at the final position of the few-shot readout, per example.
@@ -201,16 +302,27 @@ def readout_pdiff(spec: BehaviourSpec, item_texts: list[str], steer_hook=None, b
     P(" NO") at the final position. One forward pass, two logits, no generation. If a steering hook
     is active during that pass and the steered direction really carries the behaviour, the model's
     own YES/NO judgment shifts — that shift is what NIE measures.
+
+    STEERING SCOPE (2026-08-02): under `STEER_SCOPE_READOUT == "transcript"` the hook is narrowed,
+    per batch, to the transcript's own tokens — the few-shot demonstrations and the trailing
+    question are NOT steered. See the STEER_SCOPE_* note for why this matters to the metric's
+    validity. Set the module flag to "all" to reproduce the earlier numbers.
     """
     model, tokenizer = runtime.get_model(), runtime.get_tokenizer()
     yes_id, no_id = target_token_id(spec.readout_targets[0]), target_token_id(spec.readout_targets[1])
-    prompts = [spec.readout_few_shot + render_transcript(spec, x) + spec.readout_question for x in item_texts]
+    prompts, spans = _transcript_char_spans(spec, item_texts)
+    narrow = steer_hook is not None and STEER_SCOPE_READOUT == "transcript"
     out = []
     handles = steer_hook.enable() if steer_hook is not None else []
     try:
         for i in range(0, len(prompts), batch_size):
             inp = tokenizer(prompts[i:i+batch_size], return_tensors="pt", padding=True,
                             truncation=True, max_length=1024).to(model.device)
+            if narrow:
+                # Rebuilt every batch: dynamic padding means seq len differs batch to batch, and
+                # the hook raises rather than mis-apply a stale mask.
+                steer_hook.positions = _span_mask(inp, spans[i:i+batch_size],
+                                                  inp["input_ids"].shape[1])
             logits = model(**inp).logits
             last = inp["attention_mask"].sum(1) - 1
             probs = logits[t.arange(len(last)), last].softmax(-1)
@@ -218,6 +330,8 @@ def readout_pdiff(spec: BehaviourSpec, item_texts: list[str], steer_hook=None, b
     finally:
         for h in handles:
             h.remove()
+        if narrow:
+            steer_hook.positions = None           # leave the hook reusable
     return np.concatenate(out)
 
 

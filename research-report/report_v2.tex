@@ -1,0 +1,1097 @@
+%=======================================================================
+%  Probing and Steering for Safety-Relevant Behaviours in LLMs
+%  Draft v2 — regenerated 2026-08-02 from the v3 pipeline runs.
+%
+%  Referencing: HARVARD (author--date), per QMUL Faculty of Science and
+%  Engineering requirements. Implemented with natbib in author-year mode
+%  over a manual thebibliography, so no .bst file is needed:
+%     \citep{key} -> (Marks and Tegmark, 2024)
+%     \citet{key} -> Marks and Tegmark (2024)
+%
+%  Build:  latexmk -pdf report_v2.tex
+%=======================================================================
+\documentclass[conference]{IEEEtran}
+\IEEEoverridecommandlockouts
+
+\usepackage[authoryear,round]{natbib}
+\usepackage{amsmath,amssymb,amsfonts}
+\usepackage{graphicx}
+\usepackage{textcomp}
+\usepackage{xcolor}
+\usepackage{booktabs}
+\usepackage{multirow}
+\usepackage{url}
+\usepackage[hidelinks]{hyperref}
+
+% Harvard-style section heading for the reference list
+\renewcommand{\bibsection}{\section*{References}}
+
+% Placeholders for figures not yet exported from the notebooks.
+\newcommand{\TODO}[1]{\textcolor{red}{[\textbf{TODO:} #1]}}
+
+\begin{document}
+
+\title{Reading and Writing Safety Behaviours:\\
+A Read/Write Dissociation Test for Linear Probes\\
+in Llama-3.1-8B-Instruct}
+
+\author{\IEEEauthorblockN{Nimun Kaur Bajwa}
+\IEEEauthorblockA{\textit{MSc Artificial Intelligence}, Queen Mary University of London\\
+n.k.bajwa@se25.qmul.ac.uk}}
+
+\maketitle
+
+%=======================================================================
+\begin{abstract}
+Linear activation probes are used both to \emph{detect} safety-relevant
+behaviours in language models and, by adding the probe direction back into the
+residual stream, to \emph{steer} them. These are different demands on a
+direction, and the literature has met them separately: difference-of-means
+directions are reported to be the most causally implicated in model outputs,
+while logistic-regression probes are reported to be the strongest detectors.
+Read together, this suggests a \emph{read/write dissociation}, but no prior work
+tests it within a single pipeline on safety behaviours. We build such a pipeline
+and apply it uniformly to three behaviours in Llama-3.1-8B-Instruct: deception,
+high-stakes awareness, and sycophancy. Each behaviour is specified once and run
+through shared machinery: cross-validated layer selection, a five-cell probe
+grid crossing estimator with token pooling, in- and out-of-distribution
+evaluation by AUROC, and calibrated steering scored by a normalised indirect
+effect (NIE) and by an LLM judge that rates behaviour and coherence separately.
+The dissociation replicates cleanly on deception and high-stakes: the
+logistic-regression family wins 75\% and 100\% of detection columns
+respectively, while mass-mean wins 100\% of steering columns in both. It
+\emph{fails} on sycophancy, and fails in both directions at once --- mass-mean
+is the best detector (0.879 AUROC out-of-distribution) and the worst steerer.
+The coherence axis supplies a partial explanation the NIE alone cannot: at high
+steering coefficients mass-mean collapses generation quality (judge coherence
+falling to 1.0/10 on sycophancy) where logistic-regression and attention
+directions do not, so part of mass-mean's apparent causal advantage is
+\emph{steering harder}, not steering better. We conclude that the dissociation
+is a property of particular behaviour--representation pairs rather than a
+general law, and identify the specific measurement conditions under which the
+NIE is trustworthy.
+\end{abstract}
+
+\begin{IEEEkeywords}
+mechanistic interpretability, linear probes, activation steering, AI safety,
+deception detection, sycophancy, high-stakes monitoring
+\end{IEEEkeywords}
+
+%=======================================================================
+\section{Introduction}
+
+As language models are deployed in consequential settings, cheap and reliable
+monitoring of their internal state becomes a practical safety requirement.
+\emph{Activation probes} --- linear readouts of the residual stream --- are a
+leading candidate, flagging a property of interest at a small fraction of the
+cost of an auxiliary monitor model \citep{alain2018,mckenzie2025}.
+
+Two distinct questions determine whether such a probe is useful. First, does it
+\textbf{read}: does its score separate positive from negative examples, both
+in-distribution and, crucially, out-of-distribution? Second, does it
+\textbf{write}: is the direction it identifies causally implicated, such that
+adding it to the residual stream changes what the model does? A monitoring
+system needs the first. An intervention --- suppressing a behaviour at inference
+time --- needs the second. The interpretability literature has largely studied
+them apart, and on different behaviours.
+
+Three results anchor this work. \citet{marks2024}, studying truth, find that
+simple difference-of-means (``mass-mean'') directions are the most causally
+implicated, outperforming logistic regression in 7 of 8 intervention conditions,
+\emph{despite} all probing techniques classifying at comparable accuracy.
+\citet{goldowsky2025}, studying strategic deception, find logistic regression
+the strongest detector across diverse evaluation sets. \citet{mckenzie2025},
+studying whether an interaction ``might lead to significant harm,'' find that
+probes pooling over the whole sequence far outperform last-token probes and
+rival monitors orders of magnitude more expensive.
+
+Read together these suggest, but do not test, a \textbf{read/write
+dissociation}: the direction that best reads a behaviour off the activations may
+not be the direction that best writes it back in. The suggestion is fragile,
+because the three results come from different models, different behaviours,
+different metrics, and different token-selection policies. Any apparent
+dissociation could be an artefact of that heterogeneity rather than a fact about
+representations. Testing it requires holding everything else fixed.
+
+\subsection*{Contributions}
+
+\begin{enumerate}
+  \item A single specification-driven pipeline in which a behaviour is defined
+    once --- data, token mask, readout format, judge rubric --- and inherits
+    identical layer selection, probe grid, metrics, and steering machinery.
+    Adding a behaviour requires a specification and a loader, nothing else.
+  \item The first within-pipeline test of the read/write dissociation on safety
+    behaviours, across three behaviours in one model, with in- and
+    out-of-distribution evaluation on both sides.
+  \item A negative result with diagnostic value: the dissociation replicates on
+    deception and high-stakes but inverts on sycophancy, showing it is not a
+    general property of linear probes.
+  \item Evidence that the coherence axis is necessary, not decorative:
+    mass-mean's causal advantage is entangled with generation collapse at high
+    coefficients, which a readout-only causal metric cannot detect.
+  \item An explicit account of where our protocol diverges from its three source
+    papers, and what each divergence costs (Section~\ref{sec:divergences}).
+\end{enumerate}
+
+%=======================================================================
+\section{Related Work}
+
+\subsection{Linear representations and probing}
+
+The premise underlying this work is the linear representation hypothesis: that
+features are encoded as directions in activation space, so a linear readout can
+recover them \citep{alain2018,elhage2022}. Probing for truthfulness specifically
+was advanced by \citet{azaria2023} and \citet{burns2023}, the latter introducing
+Contrast-Consistent Search (CCS), an unsupervised method exploiting the
+constraint that a statement and its negation should receive opposite truth
+values.
+
+This line attracted immediate criticism. \citet{levinstein2024} showed such
+probes fail to generalise in basic ways --- notably to statements containing
+``not'' --- suggesting they may track features correlated with truth on the
+training distribution rather than truth itself. That critique motivates the
+emphasis on out-of-distribution evaluation throughout the present work: an
+in-distribution AUROC near 1.0 is, on its own, weak evidence.
+
+\subsection{Geometry of Truth: causality of directions}
+
+\citet{marks2024} address the critique with curated true/false datasets designed
+to minimise variation in non-truth features. Three contributions bear directly
+on this thesis. First, they localise truth representations by \emph{activation
+patching}: running the model on a minimal prompt pair and swapping residual
+stream activations at each (position, layer), which isolates a small group of
+causally implicated hidden states over the statement-end tokens. Second, they
+introduce mass-mean probing, $\boldsymbol{\theta}_{\mathrm{mm}} =
+\boldsymbol{\mu}^{+} - \boldsymbol{\mu}^{-}$, together with a
+covariance-corrected variant $\sigma(\boldsymbol{\theta}_{\mathrm{mm}}^{\top}
+\Sigma^{-1} \mathbf{x})$ used when evaluating in-distribution. Third, and
+centrally for us, they quantify causality with a \emph{normalised indirect
+effect} (NIE): the shift a direction induces in the model's own TRUE/FALSE
+readout, expressed in units of the unsteered gap between classes. Their
+headline is that mass-mean directions are the most causal despite comparable
+classification accuracy --- the read/write asymmetry this thesis generalises.
+
+\subsection{Deception probes}
+
+\citet{goldowsky2025} train probes on \emph{instructed pairs}: the same fact
+presented under honest and dishonest system prompts, so the activation
+difference encodes intent rather than content, and the training set contains no
+actual deception. Their probe is fitted per-token --- flattening across samples
+and sequence positions --- and scored by averaging per-token projections over
+the response. They evaluate on realistic settings including AI Liar
+\citep{pacchiardi2024}, roleplaying scenarios, and insider trading
+\citep{scheurer2023}, reporting AUROCs of 0.96--0.999 and 95--99\% recall at 1\%
+false-positive rate, where the false-positive rate is calibrated against a
+control set of Alpaca responses \citep{taori2023}. Their appendix benchmarks
+difference-of-means and LDA against logistic regression and finds performance
+``very similar across methods'' for separating honest from deceptive responses,
+with logistic regression winning specifically on separating deception from
+\emph{unrelated} transcripts.
+
+\subsection{High-stakes detection}
+
+\citet{mckenzie2025} probe for whether an interaction might lead to significant
+harm. Their contribution most relevant here is architectural: they compare
+aggregation strategies over the sequence dimension --- mean, max, last token,
+softmax-weighted and attention-weighted --- and find learned pooling superior.
+They also select their probing layer by 5-fold cross-validation on the training
+set, the protocol we adopt.
+
+\subsection{Activation steering}
+
+Contrastive Activation Addition \citep{rimsky2024} computes steering vectors as
+mean activation differences over contrast pairs and adds them at inference with
+a signed multiplier. Two details matter for our design: CAA adds the vector only
+to \emph{generated} tokens, leaving the prompt untouched, and it grades steered
+generations with an LLM judge on a 1--10 scale --- the pattern our judge
+follows. Related work on inference-time intervention \citep{li2023} and causal
+mediation analysis \citep{vig2020,meng2022} supplies the broader framing of
+directions as causal mediators.
+
+\subsection{Sycophancy}
+
+Sycophancy --- deferring to a user's stated belief over an accurate answer ---
+is well documented as an artefact of preference-based training
+\citep{perez2023,sharma2023}. We use the factorial datasets of
+\citet{cincynlp2025}, whose design permits a \emph{genuine-agreement} control:
+cases where the user happens to be correct, so agreement is candid rather than
+sycophantic. This control is what makes sycophancy a discriminating third test
+case rather than a repetition of the first two.
+
+\subsection{The gap}
+
+No prior work measures reading and writing for the same behaviour, on the same
+model, at the same layers, with matched estimators. That is the gap this thesis
+addresses.
+
+%=======================================================================
+\section{Methodology}
+
+\subsection{Requirements capture and analysis}
+
+The research question --- \emph{does the direction that best detects a safety
+behaviour also best steer it?} --- imposes requirements that are stricter than
+those of any single source paper, because the comparison, not the absolute
+performance, is the deliverable.
+
+\textbf{R1: Matched arms.} Every probe estimator must be compared under
+identical conditions: same layer, same tokens, same calibration, same
+intervention site. Any asymmetry becomes a confound.
+
+\textbf{R2: One metric per side, applied uniformly.} The three source papers use
+accuracy (\citeauthor{marks2024}), AUROC with recall at 1\% FPR
+(\citeauthor{goldowsky2025}) and AUROC (\citeauthor{mckenzie2025}). A single
+choice is needed. We use AUROC because our evaluation sets are not
+class-balanced and our probe scores are not calibrated to a common threshold ---
+notably, mass-mean's raw projection is uncentred --- so threshold-dependent
+accuracy would measure calibration drift rather than separability.
+
+\textbf{R3: Out-of-distribution evaluation is mandatory.} Given
+\citeauthor{levinstein2024}'s critique, in-distribution performance is not
+evidence. Every behaviour requires at least one held-out distribution.
+
+\textbf{R4: Causal claims need a coherence control.} A readout-based causal
+metric cannot distinguish ``the direction induced the behaviour'' from ``the
+direction broke the model,'' since a degraded model can still emit the target
+token. An independent quality measurement is required.
+
+\textbf{R5: Extensibility.} Testing a hypothesis across behaviours requires that
+adding the third behaviour not perturb the first two.
+
+\textbf{R6: No selection on evaluation data.} Layers and blocks must be chosen
+using training data only, so that out-of-distribution numbers remain
+interpretable.
+
+\subsection{Design}
+
+\subsubsection{Behaviour specification}
+Each behaviour is one \texttt{BehaviourSpec}: its name, class labels, token mask
+policy, the few-shot readout prompt and target tokens for the causal
+measurement, the judge rubric, and the steering coefficient sweep. All three
+behaviours share the pipeline; only the specification and a data loader differ,
+satisfying R5.
+
+\subsubsection{Token masking}
+Two policies are used. \texttt{assistant\_only} (deception, sycophancy) probes
+the assistant's reply content; \texttt{content\_tokens} (high-stakes) probes
+message content of every role. Both exclude BOS, chat-template header tags,
+\texttt{<|eot\_id|>} and the template's auto-injected date preamble. Masking is
+load-bearing rather than cosmetic: for deception the system prompt \emph{states
+the label}, so probing it would read an announcement rather than a
+representation.
+
+\subsubsection{Layer selection (R1, R6)}
+\label{sec:layers}
+Activation patching, \citeauthor{marks2024}'s localisation tool, does not
+transfer: it requires single-token minimal pairs and a token-level readout,
+whereas our unit is a variable-length dialogue with no canonical
+summarisation position. We therefore split the problem by side.
+
+The \emph{detection} layer is the argmax of a pair-aware 5-fold
+cross-validated AUROC over mean-pooled training activations, following
+\citet{mckenzie2025}. Folds are grouped by pair identifier so that no pair
+straddles a fold --- without this, one member of an instructed pair leaks a
+near-duplicate of its twin into the test fold. Mass-mean is the selector because
+it is closed-form and cheap; a logistic-regression sweep is overlaid as a
+robustness check before committing.
+
+The \emph{steering} block is chosen causally: the NIE is computed at every layer
+with a single layer steered at a time, and the contiguous five-layer window of
+maximum summed NIE is selected. This promotes the NIE from a reporting metric to
+a search criterion, which \citeauthor{marks2024} do not do; the consequence is
+discussed in Section~\ref{sec:limitations}.
+
+\subsubsection{Probe grid (R1)}
+Five cells cross estimator with pooling: mass-mean and logistic regression over
+last-token and mean pooling, plus a learned attention probe
+\citep{mckenzie2025,kantamneni2025}. The mass-mean probe is
+$\boldsymbol{\mu}^{+}-\boldsymbol{\mu}^{-}$. The logistic-regression probe uses
+$L_2$ regularisation at $\lambda=10$ on standardised activations, reproducing
+\citeauthor{goldowsky2025}'s hyperparameters exactly. The \texttt{LR (mean)}
+cell is fitted per-token in their manner; because standardise-then-project is
+affine, mean-pooling the activations and projecting equals the mean of
+per-token projections, so both their fitting and their aggregation are
+reproduced rather than approximated. The flattened token set is uncapped for all
+three behaviours: a 60{,}000-row tractability cap inherited from earlier hardware
+bound only on high-stakes, where it discarded 79\% of 285{,}394 rows and so made
+this one cell a faithful reproduction for two behaviours and a 21\% subsample for
+the third. Removing it restores symmetry in the cell whose purpose is to
+reproduce \citeauthor{goldowsky2025} exactly.
+
+\subsubsection{Steering (R1, R4)}
+Directions are refitted at each block layer and calibrated so that coefficient
+$1.0$ moves the mean negative activation onto the mean positive one, following
+\citeauthor{marks2024}'s normalisation. This makes coefficients comparable
+across estimators whose raw directions differ in norm.
+
+\emph{Where the vector is written} is set by the instrument, and is the one place
+this pipeline initially diverged from both source papers without justification.
+The vector was originally applied at every token position, a convention inherited
+from the ARENA teaching notebook this project builds on \citep{arena2024}. That is
+untenable for the readout: the few-shot demonstrations contain the literal
+\textsc{yes}/\textsc{no} tokens the metric reads, so steering them can move the
+answer logits without changing how the transcript is represented, and the measured
+effect would partly be pressure on the instrument.
+\citet{marks2024} avoid exactly this by confining the intervention to their
+group~(b) hidden states and excluding the readout position. The scope is therefore
+narrowed per instrument: the readout steers \textbf{only the item transcript}
+(15--21\% of the prompt, varying with transcript length), and generation steers
+\textbf{only the completion}, leaving the prompt as the model sees it --- which is
+also what real CAA does \citep{rimsky2024}, despite the every-token setting having
+cited it. Uniformity across arms is preserved: within a scope every direction
+touches identical positions, so a difference between estimators still cannot arise
+from one touching fewer tokens than another. \textbf{The steering results in
+Section~\ref{sec:results} predate this change and are therefore upper bounds}; see
+Section~\ref{sec:limitations}.
+
+Two independent measurements are taken at every (direction, coefficient):
+
+\emph{NIE.} The model reads a few-shot prompt ending in a YES/NO question about
+a transcript, and we record the probability difference
+$PD = P(\textsc{yes})-P(\textsc{no})$ at the final position. Writing $PD^{+}$
+and $PD^{-}$ for the unsteered means over positive and negative transcripts and
+$PD^{-}_{*}$ for the steered mean over negatives, the normalised indirect
+effect is
+\begin{equation}
+\mathrm{NIE} \;=\; \frac{PD^{-}_{*} - PD^{-}}{PD^{+} - PD^{-}} ,
+\label{eq:nie}
+\end{equation}
+reproducing \citeauthor{marks2024}'s $\text{false}\!\to\!\text{true}$ ratio with
+YES/NO substituted for TRUE/FALSE. $\mathrm{NIE}=0$ means the intervention did
+nothing; $\mathrm{NIE}=1$ means it moved the negatives a full class gap. No text
+is generated. The denominator makes the metric scale-free, but also fragile: it
+is only meaningful when the model can separate the classes unsteered, which
+motivates the guard in Section~III-E and the diagnostic in
+Table~\ref{tab:gaps}.
+
+\emph{Judge.} The model generates from a prompt with steering active, and Claude
+Haiku 4.5 scores the generation 1--10 on the behaviour rubric \emph{and}
+separately on coherence, satisfying R4. Scores are bounded server-side by an
+enumerated JSON schema.
+
+Only negative-class examples are steered, toward the behaviour; positives supply
+the denominator. Coefficients sweep $\{-2,-1,-0.5,0,0.5,1,2\}$, so monotonicity
+can be inspected and the negative half acts as a control.
+
+Generation prompts follow one rule across behaviours, adapted from CAA's practice
+of deriving open-ended prompts from the same held-out items as the constrained
+evaluation \citep{rimsky2024}: \textbf{a generation prompt is one where the
+behaviour is off but possible}. For deception that is an AI Liar scenario under its
+neutral instruction; for high-stakes, a low-stakes scenario; for sycophancy, a user
+turn carrying a \emph{false} claim. The last case needs stating because a user turn
+has no sycophancy label of its own --- sycophancy is a property of the reply, which
+does not yet exist --- so what a false claim supplies is a prompt on which the
+model \emph{could} defer but unsteered does not. A true claim is not
+``behaviour off'' but behaviour \emph{impossible}: measured
+$P(\text{sycophantic} \mid \text{claim true}) = 0.000$ across 403 rows, structurally,
+since sycophancy requires echoing a belief that is wrong. An earlier contiguous
+selection of prompts was half true-claim against an 18\% base rate, so half the
+sycophancy judge prompts could not register induction at all; selection is now
+filtered on claim truth.
+
+\subsection{Implementation}
+
+The pipeline is a Python package (\texttt{safety\_probes}, $\approx$2{,}900
+lines) with driver notebooks per behaviour. It evolved through three versions:
+an ARENA teaching notebook \citep{arena2024}, a monolithic audited notebook, and
+the current modular package, whose docstrings cite the source paper section for
+each estimator so provenance is checkable at the line level.
+
+Two implementation decisions were forced by scale. Activations are extracted
+once per example at \emph{all} layers in a single forward pass and cached as
+fp16, which makes the 32-layer sweep essentially free; full un-pooled token
+grids are extracted only at the single chosen layer, since they are roughly
+eight times larger. All tokenisation flows through shared helpers, after a
+double-BOS defect was found in which templated text and masks disagreed by one
+token --- silently scoring every probe on misaligned activations.
+
+Experiments ran on one NVIDIA RTX 5090 (32\,GB) with Llama-3.1-8B-Instruct in
+8-bit. The dominant cost is attention-probe training across the steering block:
+approximately three hours for deception.
+
+\subsection{Testing and evaluation}
+
+\textbf{Parity gating.} The modular package is required to reproduce the audited
+monolithic notebook's selected layers, steering blocks and grid AUROCs before
+any result is quoted. Refactors that change numbers are treated as defects.
+
+\textbf{Leakage controls.} Splits are pair-aware throughout: by fact for
+deception, by pair for high-stakes, by prompt group for sycophancy. Layer and
+block selection use training data only (R6); the block-selection sweep uses
+train-split transcripts while reported curves use held-out ones.
+
+\textbf{Metric guards.} AUROC is reported with a bootstrap 95\% confidence
+interval (1{,}000 resamples). TPR at 1\% FPR returns \texttt{n/a} when a set has
+fewer than 100 negatives, since the target rate is then unreachable and the
+metric would silently degrade to TPR at zero false positives --- this is why AI
+Liar (27 negatives) is reported as \texttt{n/a} rather than as a number. The NIE
+denominator is recomputed on the texts each NIE is measured on, and a warning
+fires when the unsteered class gap falls below 0.05, at which point the NIE is
+ill-defined.
+
+\textbf{Judge validation.} A blind protocol exists in which the author scores a
+sample of generations without seeing the judge's scores, and agreement is
+reported as Spearman $\rho$ and mean absolute difference. \emph{This has not yet
+been run}, so all judge numbers below are unvalidated; see
+Section~\ref{sec:limitations}.
+
+\subsection{Divergences from the source papers}
+\label{sec:divergences}
+
+Because the comparison is the deliverable, protocol divergences are stated
+rather than absorbed.
+
+\textbf{No covariance-corrected mass-mean arm.} Both \citet{marks2024} (as
+$p^{\text{iid}}_{\text{mm}}$) and \citet{goldowsky2025} (as LDA) benchmark
+$\Sigma^{-1}(\boldsymbol{\mu}^{+}-\boldsymbol{\mu}^{-})$; we implement only the
+plain form. This is well-baselined --- \citeauthor{marks2024} report the
+uncorrected probe for every out-of-distribution evaluation and throughout their
+causal results --- so the omission costs a possible replication rather than a
+missing baseline. It does mean our in-distribution mass-mean numbers should not
+be read against \citeauthor{marks2024}'s ``comparable accuracy'' claim, which
+rests on the corrected variant.
+
+\textbf{No control set.} \citeauthor{goldowsky2025} calibrate false positives
+against Alpaca responses; we lack such a split, so our TPR at 1\% FPR is
+computed within each evaluation set. It shares a name with theirs but is a
+different measurement, and their headline recall figure is not reproducible
+here.
+
+\textbf{Intervention extent.} \citeauthor{marks2024} steer only statement-end
+tokens; CAA steers only generated tokens. We steer every token of whatever is
+processed, including the readout's few-shot demonstrations. Absolute NIEs are
+therefore not comparable with published values.
+
+\textbf{Scale.} All three source papers use 70B-class models; we use 8B, for
+which no published baselines exist.
+
+%=======================================================================
+\section{Results}
+\label{sec:results}
+
+\subsection{Configuration}
+
+Table~\ref{tab:config} reports the selected layers and data budgets. The three
+behaviours place their detection layers very differently --- 12, 13 and 19 of 32
+--- and their steering blocks differently again, with sycophancy's block
+(layers 5--9) lying \emph{below} its detection layer, the only behaviour where
+the causal site is earlier than the readable one.
+
+\begin{table}[t]
+\caption{Selected configuration and data budgets. Layers are 0-indexed of 32.}
+\label{tab:config}
+\centering
+\small
+\begin{tabular}{lccc}
+\toprule
+& \textbf{Deception} & \textbf{High-stakes} & \textbf{Sycophancy} \\
+\midrule
+Detection layer & 12 & 13 & 19 \\
+Steering block  & 15--19 & 8--12 & 5--9 \\
+Mask policy & assistant & content & assistant \\
+Train examples & 488 & 3{,}000 & 2{,}736 \\
+ID test & 124 & 1{,}000 & 694 \\
+OOD set & AI Liar 54 & HH 2{,}984 & math 1{,}000 \\
+        & Roleplay 742 & & \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\begin{figure}[t]
+\centering
+\fbox{\parbox[c][2.4cm][c]{0.92\columnwidth}{\centering
+\TODO{layer-selection panels: pair-aware CV AUROC vs.\ layer for all 32 layers,
+MM (selector) and LR (robustness overlay), chosen layer marked. One panel per
+behaviour. Source: \texttt{viz.plot\_layer\_selection} in each driver notebook.}}}
+\caption{Detection-layer selection by pair-aware 5-fold cross-validated AUROC on
+the training split.}
+\label{fig:layers}
+\end{figure}
+
+\subsection{Linear structure}
+
+For all three behaviours, unsupervised PCA of the detection-layer activations
+shows \emph{no} class separation, while the histogram of projections onto the
+trained direction separates cleanly. This is the expected and informative
+result: the behaviour is a low-variance direction that content variance
+swamps. For deception the pair structure is directly visible, with each pair's
+two members co-located because they are byte-identical apart from the system
+prompt. Had PCA separated the classes, the leading explanation would be a topic
+confound of the kind \citeauthor{goldowsky2025} report, where a deception probe
+partly tracks ``something close to morality.''
+
+\begin{figure}[t]
+\centering
+\fbox{\parbox[c][2.4cm][c]{0.92\columnwidth}{\centering
+\TODO{PCA + projection panels, one row per behaviour: left, PCA of centred
+detection-layer activations (expect no separation); right, histogram of
+projections onto the trained MM direction (expect bimodal separation). Source:
+\texttt{viz.pca\_and\_projection\_panel}.}}}
+\caption{Unsupervised variance does not reveal the behaviour; the supervised
+direction does. Left panels show no class separation under PCA; right panels
+show clean separation along the probe direction.}
+\label{fig:pca}
+\end{figure}
+
+\subsection{Detection}
+
+Table~\ref{tab:detection} gives the out-of-distribution AUROC for every cell,
+the column on which the read side of the hypothesis is judged.
+
+\begin{table*}[t]
+\caption{Detection AUROC with bootstrap 95\% confidence intervals,
+in-distribution and out-of-distribution. Deception OOD is the pooled AI Liar
+$+$ Roleplaying set; high-stakes OOD is Anthropic-HH; sycophancy OOD is the
+held-out math domain. Best OOD cell per behaviour in \textbf{bold}.}
+\label{tab:detection}
+\centering
+\footnotesize
+\setlength{\tabcolsep}{3.5pt}
+\begin{tabular}{lcccccc}
+\toprule
+& \multicolumn{2}{c}{\textbf{Deception}} & \multicolumn{2}{c}{\textbf{High-stakes}} & \multicolumn{2}{c}{\textbf{Sycophancy}} \\
+\cmidrule(lr){2-3}\cmidrule(lr){4-5}\cmidrule(lr){6-7}
+Probe & ID & OOD & ID & OOD & ID & OOD \\
+\midrule
+MM (last) & 0.948 [0.91,0.98] & 0.696 [0.66,0.73] & 0.867 [0.84,0.89] & 0.678 [0.66,0.70] & 0.976 [0.97,0.98] & \textbf{0.879} [0.86,0.90] \\
+MM (mean) & 1.000 [1.00,1.00] & 0.679 [0.64,0.72] & 0.951 [0.94,0.96] & 0.699 [0.68,0.72] & 0.928 [0.91,0.94] & 0.802 [0.77,0.83] \\
+LR (last) & 0.996 [0.99,1.00] & 0.571 [0.53,0.61] & 0.977 [0.97,0.98] & 0.782 [0.77,0.80] & 0.975 [0.97,0.98] & 0.847 [0.82,0.87] \\
+LR (mean) & 1.000 [1.00,1.00] & \textbf{0.722} [0.69,0.76] & 0.995 [0.99,1.00] & \textbf{0.826} [0.81,0.84] & 0.970 [0.96,0.98] & 0.825 [0.80,0.85] \\
+LR-attention & 1.000 [1.00,1.00] & 0.685 [0.65,0.72] & 0.997 [0.99,1.00] & 0.808 [0.79,0.82] & 0.974 [0.96,0.98] & 0.861 [0.84,0.88] \\
+\midrule
+LR-family win share & \multicolumn{2}{c}{75\%} & \multicolumn{2}{c}{100\%} & \multicolumn{2}{c}{0\%} \\
+\bottomrule
+\end{tabular}
+\end{table*}
+
+Three observations. First, in-distribution AUROC is uninformative: four of five
+deception cells reach $\geq 0.996$ and three reach exactly 1.000. The
+comparison only becomes visible out-of-distribution, vindicating R3. Second, for
+deception and high-stakes the logistic-regression family dominates the OOD
+column, as \citeauthor{goldowsky2025} predict --- \texttt{LR (mean)} wins both,
+by 0.026 and 0.018 AUROC respectively. Third, sycophancy inverts this entirely:
+\texttt{MM (last)} is the best OOD detector at 0.879, and the LR family wins
+\emph{no} column.
+
+The deception OOD column decomposes informatively (Table~\ref{tab:decood}). AI
+Liar and Roleplaying are deliberately different kinds of held-out set: on AI
+Liar the honest and deceptive members share \emph{byte-identical} answer text
+and differ only in the system framing, so a probe must read intent in context;
+on Roleplaying the completions are genuinely different text, so surface cues are
+available. Every cell scores well on AI Liar ($0.818$--$0.992$) and every cell
+collapses on Roleplaying ($0.554$--$0.706$).
+
+That ordering is the opposite of what a surface-cue explanation predicts. If the
+probes were reading deceptive \emph{phrasing}, Roleplaying --- where the
+phrasing differs by label --- should be the easier set. Instead the set where
+the text is identical across labels is the one they handle, which is evidence
+that the probes read framing-in-context rather than lexical markers. It also
+identifies Roleplaying as the genuinely hard generalisation target, and explains
+why deception steering fails there entirely (Section~IV-D).
+
+\begin{table}[t]
+\caption{Deception detection AUROC split by out-of-distribution set. AI Liar has
+byte-identical answers across labels; Roleplaying has genuinely different
+completions. TPR at 1\% FPR is \texttt{n/a} on AI Liar (27 negatives $<100$).}
+\label{tab:decood}
+\centering
+\small
+\begin{tabular}{lccc}
+\toprule
+Probe & ID test & AI Liar & Roleplaying \\
+\midrule
+MM (last)     & 0.948 & 0.959 & 0.669 \\
+MM (mean)     & 1.000 & 0.992 & 0.654 \\
+LR (last)     & 0.996 & 0.818 & 0.554 \\
+LR (mean)     & 1.000 & 0.974 & \textbf{0.706} \\
+LR-attention  & 1.000 & 0.989 & 0.657 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\subsection{Steering}
+
+Table~\ref{tab:steering} gives the NIE at coefficient $+1$.
+
+\begin{table*}[t]
+\caption{Normalised indirect effect at coefficient $+1$. Higher is more causal;
+NIE $=1$ means steering moved the negatives one full class gap. Best per column
+in \textbf{bold}. The read/write dissociation holds where the LR family wins
+Table~\ref{tab:detection} and MM wins here --- true for deception and
+high-stakes, false for sycophancy.}
+\label{tab:steering}
+\centering
+\small
+\begin{tabular}{lccccccc}
+\toprule
+& \multicolumn{3}{c}{\textbf{Deception}} & \multicolumn{2}{c}{\textbf{High-stakes}} & \multicolumn{2}{c}{\textbf{Sycophancy}} \\
+\cmidrule(lr){2-4}\cmidrule(lr){5-6}\cmidrule(lr){7-8}
+Dir. & ID$^{\dagger}$ & Liar & Role & ID & HH & ID & math \\
+\midrule
+MM  & \textbf{7.25} & \textbf{0.16} & $-$0.07 & \textbf{1.52} & \textbf{0.56} & 0.08 & $-$0.16 \\
+LR  & 2.29 & 0.05 & $-$0.08 & 1.01 & 0.12 & $-$0.00 & $-$0.01 \\
+LR-att & 1.15 & $-$0.02 & $-$0.18 & 1.38 & 0.26 & \textbf{0.25} & \textbf{0.34} \\
+\midrule
+MM win share & \multicolumn{3}{c}{100\%} & \multicolumn{2}{c}{100\%} & \multicolumn{2}{c}{0\%} \\
+\bottomrule
+\end{tabular}
+\smallskip
+\footnotesize
+$^{\dagger}$Unreliable: the unsteered class gap on this set is $+0.058$, barely
+above the ill-defined threshold, so the ratio is inflated roughly seventeenfold
+(Table~\ref{tab:gaps}). The AI Liar column supports the same ranking on a
+healthy gap of $1.052$ and is the one relied on.
+\end{table*}
+
+For deception and high-stakes, mass-mean wins every steering column, exactly as
+\citeauthor{marks2024} report for truth. Combined with the detection results,
+the read/write dissociation \textbf{holds} for both: LR reads best, MM writes
+best.
+
+For sycophancy it fails, and fails on both sides at once. Mass-mean is the best
+\emph{detector} and among the worst steerers; the attention direction is the
+only one producing a clean monotone dose--response (ID: $0.11 \to 0.25 \to
+0.51$; math: $0.13 \to 0.34 \to 0.48$). Mass-mean's sycophancy curve is
+non-monotone, peaking at coefficient $+0.5$ (ID NIE $0.89$) before collapsing to
+$0.08$ at $+1$ --- which is where our verdict is read. The single-point
+convention therefore misses a real effect that exists only in a narrow window.
+
+\subsection{When is the NIE trustworthy?}
+
+Because the NIE divides by the unsteered class gap
+(Equation~\ref{eq:nie}), its reliability varies by evaluation set in a way the
+ratio itself hides. Table~\ref{tab:gaps} reports the denominators.
+
+\begin{table}[t]
+\caption{NIE denominators: the unsteered gap $PD^{+}-PD^{-}$ on each evaluation
+set. A gap near zero means the model cannot self-report the behaviour in the
+readout format, and the ratio becomes unstable.}
+\label{tab:gaps}
+\centering
+\small
+\begin{tabular}{llccl}
+\toprule
+Behaviour & Set & $PD^{+}$ & $PD^{-}$ & Gap \\
+\midrule
+Deception   & ID          & $-0.906$ & $-0.964$ & $+0.058$ \\
+Deception   & AI Liar     & $+0.772$ & $-0.280$ & $+1.052$ \\
+Deception   & Roleplaying & $+0.862$ & $+0.122$ & $+0.740$ \\
+High-stakes & ID          & $+0.803$ & $+0.463$ & $+0.340$ \\
+High-stakes & HH          & $+0.505$ & $-0.894$ & $+1.399$ \\
+Sycophancy  & ID          & $+0.982$ & $-0.034$ & $+1.016$ \\
+Sycophancy  & math        & $+0.933$ & $+0.162$ & $+0.770$ \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+The deception ID row is the problem case. Both class means sit near $-0.9$: the
+model answers ``NO'' to the deception question for honest \emph{and} deceptive
+transcripts alike, leaving a gap of $0.058$, barely above the threshold at which
+our implementation warns that the metric is ill-defined. The reported ID NIE of
+7.25 is that small denominator, not a large effect --- dividing by $0.058$
+inflates the ratio roughly seventeenfold relative to a unit gap. The
+instructed-pairs format, in which the assistant merely states a fact under a
+dishonest persona, apparently does not read as deception to the model judging
+its own transcript.
+
+This has a direct methodological consequence: \textbf{the deception ID column
+should not be quoted}, and the ranking it appears to support (MM $\gg$ LR $>$
+LR-attention) rests on it. The AI Liar column, with a healthy gap of $1.052$,
+supports the same ranking on sounder footing and is the one we rely on. The
+remaining sets all have gaps above $0.34$ and are usable.
+
+Finally, on Roleplaying all three directions produce NIEs at or below zero:
+deception steering does not transfer to the harder OOD set at all, mirroring the
+detection collapse on the same set.
+
+\subsection{Coherence: what the NIE cannot see}
+
+Table~\ref{tab:coherence} reports judge coherence at coefficient $+2$ against
+the unsteered baseline.
+
+\begin{table}[t]
+\caption{Judge coherence (1--10) at coefficient $0$ and $+2$. Mass-mean degrades
+generation quality where the other directions do not.}
+\label{tab:coherence}
+\centering
+\small
+\begin{tabular}{llcccc}
+\toprule
+Behaviour & Set & \multicolumn{2}{c}{MM} & LR & LR-att \\
+\cmidrule(lr){3-4}
+& & coef 0 & coef $+2$ & coef $+2$ & coef $+2$ \\
+\midrule
+Deception   & Liar & 4.38 & 1.92 & 3.83 & 6.29 \\
+Deception   & Role & 6.08 & 1.38 & 2.58 & 4.92 \\
+High-stakes & ID   & 4.42 & 2.83 & 4.38 & 5.04 \\
+High-stakes & HH   & 6.21 & 2.83 & 5.79 & 6.00 \\
+Sycophancy  & ID   & 9.08 & 1.00 & 9.17 & 8.33 \\
+Sycophancy  & math & 6.58 & 1.00 & 7.17 & 7.25 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+The pattern is uniform across all three behaviours: at coefficient $+2$
+mass-mean collapses coherence, in the sycophancy case to the floor of the scale,
+while logistic-regression and attention directions leave it essentially intact.
+On sycophancy this is decisive. Mass-mean does move the judged behaviour score
+substantially (ID: $1.17 \to 5.67$ at coefficient $+1$), but coherence falls
+from 9.08 to 3.83 at the same point --- the model is producing sycophantic-looking
+text by degrading, not by adopting the behaviour cleanly. The attention
+direction holds coherence above 8.3 throughout but barely moves the behaviour
+score. Neither is a clean success, and the NIE alone would have reported the
+first as one.
+
+\begin{figure}[t]
+\centering
+\fbox{\parbox[c][2.6cm][c]{0.92\columnwidth}{\centering
+\TODO{dose--response panels: NIE, judge behaviour and judge coherence against
+signed coefficient $(-2 \ldots +2)$, three directions overlaid, one row per
+behaviour $\times$ evaluation set. Source:
+\texttt{viz.plot\_steering\_effects}. The sycophancy row is the important one:
+MM's non-monotone NIE peak at $+0.5$ and its coherence cliff should both be
+visible.}}}
+\caption{Dose--response. The coherence panel is what distinguishes inducing a
+behaviour from degrading the model.}
+\label{fig:dose}
+\end{figure}
+
+%=======================================================================
+\section{Discussion}
+
+\textbf{The dissociation is real but conditional.} On two of three behaviours,
+directions that read best and directions that write best are different
+directions, reproducing on safety behaviours what \citet{marks2024} found for
+truth. This is not an artefact of comparing across papers: here the model,
+layer, tokens, calibration and intervention site are identical across arms.
+
+\textbf{Sycophancy shows it is not a law.} The inversion is complete --- the
+mass-mean direction is simultaneously the best detector and among the worst
+steerers. Several explanations are available and distinguishable in principle.
+Sycophancy's label is \emph{relational}: it depends on whether the reply matches
+a claim that is itself true or false, and nearly a third of our negatives are
+genuine-agreement cases where agreeing is the candid response. A
+difference-of-means direction over such data may capture the surface regularity
+of agreement, which reads well but is not the causal lever for producing
+deference. This is consistent with the observation that sycophancy's steering
+block (layers 5--9) sits below its detection layer (19): the site that is
+readable is not the site that is writable, which is not the case for the other
+two behaviours.
+
+\textbf{Coherence changes the interpretation of causality.} Mass-mean's
+advantage on deception and high-stakes co-occurs with systematically worse
+generation quality at high coefficients. A readout-based causal metric cannot
+see this, because a degraded model can still emit ``YES''. This does not void
+the dissociation --- at coefficient $+1$ mass-mean leads on both NIE and judged
+behaviour for high-stakes while coherence is close to baseline --- but it means
+``more causal'' should be read as ``larger effect per unit coefficient, with
+faster degradation,'' not as unambiguously better. This nuance is unavailable to
+\citeauthor{marks2024}'s readout-only design and is, we think, the most
+transferable methodological finding here.
+
+\textbf{Detection generalisation is the binding constraint.} Every behaviour
+loses substantial AUROC out-of-distribution: deception from 1.000 to 0.722,
+high-stakes from 0.997 to 0.826, sycophancy from 0.976 to 0.879. At an 8B scale
+these probes would not yet support deployment as monitors, which is consistent
+with \citeauthor{goldowsky2025}'s own conclusion that current performance is
+``insufficient as a robust defence.''
+
+\subsection{Comparison with published results}
+
+Our absolute numbers sit below the source papers', and the gaps are interpretable
+rather than mysterious. \citet{goldowsky2025} report AUROCs of 0.96--0.999 on
+deception evaluation sets against our 0.722 pooled OOD; \citet{mckenzie2025}
+report strong out-of-distribution transfer against our 0.826. Three differences
+account for most of this. First, scale: both use 70B-class models and we use 8B,
+and \citeauthor{marks2024} show explicitly that probe generalisation improves
+with model size. Second, evaluation-set difficulty: our deception OOD pool is
+dominated by Roleplaying (742 of 796 examples), which is the harder,
+content-defined set, whereas the AI Liar column alone reaches 0.974--0.992 and
+is much closer to published territory. Third, metric definition: our TPR at 1\%
+FPR is calibrated within each evaluation set rather than against an Alpaca
+control, so it is not comparable with \citeauthor{goldowsky2025}'s recall figure
+even in principle.
+
+The steering side cannot be compared numerically at all, because our
+intervention site differs (every token, versus statement-end tokens in
+\citeauthor{marks2024}). What \emph{is} comparable is the ordering, and on
+deception and high-stakes the ordering reproduces theirs.
+
+\subsection{Limitations}
+\label{sec:limitations}
+
+\textbf{The judge is unvalidated.} The blind agreement protocol has not been
+run, so every judge number is provisional. Given that coherence carries much of
+the interpretation above, this is the most important outstanding item.
+
+\textbf{NIE is selected on.} Steering blocks are chosen to maximise summed NIE,
+and NIE is then reported at those blocks. Train/test separation is maintained
+--- the sweep uses training transcripts, reported curves use held-out ones ---
+so this is ordinary hyperparameter selection rather than leakage, but
+in-distribution NIEs are closer to fitted values than out-of-distribution ones,
+and the latter should be given more weight.
+
+\textbf{The block is selected using mass-mean only.} The sweep uses the
+mass-mean direction, and the resulting block is used for all three arms. This is
+conservative for comparability but leaves an alternative explanation open: if
+mass-mean wins on steering, the block may have been chosen to suit it. A sweep
+with the logistic-regression direction, showing the block barely moves, would
+close this.
+
+\textbf{The reported steering numbers predate the scope fix, and are upper
+bounds.} Every NIE in Section~\ref{sec:results} was measured with the vector
+written to all tokens of the readout prompt, so part of each value may be direct
+pressure on the few-shot demonstrations and the question rather than a change in
+how the transcript is represented. The transcript-only scope described in
+Section~III-B is implemented and unit-tested but \emph{has not yet been re-run},
+and it shrinks the intervention from 100\% of the prompt to 15--21\%. Magnitudes
+should be expected to fall. Because the change is uniform across all three
+directions, the \emph{ordering} --- which arm writes better, the thesis's actual
+claim --- is far more likely to survive than the absolute values. Re-running the
+steering sections is the single highest-priority outstanding item, and needs no
+re-extraction or probe retraining, since directions and detection results are
+unaffected.
+
+\textbf{The Roleplaying judge panel cannot show induction.} Its generation
+prompts are scenarios with inherent pressure --- a salesperson who loses
+commission by admitting a fault --- and \texttt{roleplaying\_messages} varies only
+the assistant completion, so the honest/deceptive flag is a no-op once the
+completion is stripped for generation. There is thus no behaviour-off variant of a
+Roleplaying prompt, and the unsteered baseline is already 6.96/10 deceptive; the
+panel stays within 6.08--7.83 across the whole coefficient sweep for every
+direction. That panel should be read as uninformative about induction rather than
+as evidence that steering failed. Roleplaying's detection results and its NIE are
+unaffected, and its high baseline makes it the natural set for a future
+\emph{suppression} experiment.
+
+\textbf{Single model, single seed.} All results are one seed on one 8B model.
+The dissociation's dependence on scale is untested.
+
+%=======================================================================
+\section{Future Work}
+
+\textbf{Close the open controls.} In priority order: re-run the steering sections
+under the corrected transcript-only and completion-only scope, which is
+implemented and tested but not yet reflected in any reported number; run the blind
+judge validation, without which every judge figure --- including the coherence
+result the discussion leans on --- is unvalidated; and sweep the steering block
+with the logistic-regression direction to rule out the block having been chosen to
+suit mass-mean. A covariance-corrected mass-mean arm was considered and set aside:
+both source papers benchmark it, but with $d=4096$ and at most a few thousand
+mean-pooled examples the covariance is severely rank-deficient for every behaviour,
+so the estimate would depend heavily on the pseudo-inverse regulariser. The cheaper
+version of the same test is to report
+$\cos(\Sigma^{-1}\boldsymbol{\theta}_{\mathrm{mm}}, \boldsymbol{\theta}_{\mathrm{LR}})$,
+which \citeauthor{marks2024}'s App.~F predicts should be near 1 and which would
+explain the read-side result mechanistically rather than merely observing it.
+
+\textbf{Complete the metric.} Add the reverse steering direction
+($\text{positive}\!\to\!\text{negative}$), which \citeauthor{marks2024} report
+and we do not; their results show the two directions can differ substantially.
+Add an Alpaca-style control split so that TPR at 1\% FPR means what it means in
+the deception literature.
+
+\textbf{Explain the sycophancy inversion.} The relational-label hypothesis is
+testable: restricting training to non-genuine-agreement negatives should, if
+correct, move the mass-mean direction toward a causal lever at the cost of
+detection performance. The read--write gap between layer 19 and layers 5--9
+invites a layer-resolved analysis of where deference is computed versus where it
+is legible.
+
+\textbf{Scale and mechanism.} Extending to 70B models would test whether the
+dissociation strengthens with scale, as \citeauthor{marks2024} observe for
+linear structure generally. Replacing linear directions with sparse-autoencoder
+latents \citep{cunningham2023,bricken2023} would test whether a sparser basis
+separates the readable feature from the writable one --- the natural mechanistic
+follow-up to the sycophancy result.
+
+\textbf{Composition.} Preliminary machinery exists for steering two behaviours
+simultaneously. Whether directions compose, cancel, or simply produce
+incoherence is unanswered by any of the source papers and is a natural extension
+given that the coherence axis is already instrumented.
+
+%=======================================================================
+\section{Conclusion}
+
+We built a single pipeline that tests, for three safety behaviours in one model,
+whether the direction that best detects a behaviour is the direction that best
+steers it. For deception and high-stakes the answer is no, and in the specific
+manner the literature implies: logistic-regression directions read best,
+mass-mean directions write best. For sycophancy the pattern inverts completely,
+showing that the dissociation is a property of particular
+behaviour--representation pairs rather than of linear probes in general. The
+coherence axis further shows that mass-mean's causal advantage is partly a
+matter of steering harder rather than steering better. We regard the sycophancy
+inversion, and the measurement conditions under which the NIE is and is not
+trustworthy, as the more useful contributions of the two.
+
+%=======================================================================
+\section*{Acknowledgment}
+
+The author thanks her supervisor for guidance throughout. The pipeline builds on
+the ARENA 3.0 interpretability curriculum \citep{arena2024} and on datasets
+released by \citet{goldowsky2025}, \citet{mckenzie2025} and
+\citet{cincynlp2025}. Use of generative AI tools is declared in Appendix~D.
+
+%=======================================================================
+\begin{thebibliography}{99}
+\setlength{\itemsep}{2pt}
+
+\bibitem[Alain and Bengio(2018)]{alain2018}
+Alain, G. and Bengio, Y. (2018) `Understanding intermediate layers using linear
+classifier probes', \textit{arXiv preprint} arXiv:1610.01644.
+
+\bibitem[Azaria and Mitchell(2023)]{azaria2023}
+Azaria, A. and Mitchell, T. (2023) `The internal state of an LLM knows when it's
+lying', in \textit{Findings of EMNLP 2023}, pp. 967--976.
+
+\bibitem[Bricken et al.(2023)]{bricken2023}
+Bricken, T., Templeton, A., Batson, J., et al. (2023) `Towards monosemanticity:
+decomposing language models with dictionary learning',
+\textit{Transformer Circuits Thread}.
+
+\bibitem[Burns et al.(2023)]{burns2023}
+Burns, C., Ye, H., Klein, D. and Steinhardt, J. (2023) `Discovering latent
+knowledge in language models without supervision', in \textit{International
+Conference on Learning Representations (ICLR)}.
+
+\bibitem[CincyNLP(2025)]{cincynlp2025}
+CincyNLP (2025) \textit{Disentangling sycophancy: factorial evaluation
+datasets}. Available at: \url{https://github.com/cincynlp/disentangle-sycophancy}
+(Accessed: 30 July 2026).
+
+\bibitem[Cunningham et al.(2023)]{cunningham2023}
+Cunningham, H., Ewart, A., Riggs, L., Huben, R. and Sharkey, L. (2023) `Sparse
+autoencoders find highly interpretable features in language models',
+\textit{arXiv preprint} arXiv:2309.08600.
+
+\bibitem[Elhage et al.(2022)]{elhage2022}
+Elhage, N., Hume, T., Olsson, C., et al. (2022) `Toy models of superposition',
+\textit{Transformer Circuits Thread}.
+
+\bibitem[Goldowsky-Dill et al.(2025)]{goldowsky2025}
+Goldowsky-Dill, N., Chughtai, B., Heimersheim, S. and Hobbhahn, M. (2025)
+`Detecting strategic deception using linear probes', \textit{arXiv preprint}
+arXiv:2502.03407.
+
+\bibitem[Kantamneni et al.(2025)]{kantamneni2025}
+Kantamneni, S., Engels, J., Rajamanoharan, S. and Nanda, N. (2025) `Are sparse
+autoencoders useful? A case study in sparse probing', \textit{arXiv preprint}
+arXiv:2502.16681.
+
+\bibitem[Levinstein and Herrmann(2024)]{levinstein2024}
+Levinstein, B.A. and Herrmann, D.A. (2024) `Still no lie detector for language
+models: probing empirical and conceptual roadblocks',
+\textit{Philosophical Studies}, 181, pp. 2673--2694.
+
+\bibitem[Li et al.(2023)]{li2023}
+Li, K., Patel, O., Vi\'egas, F., Pfister, H. and Wattenberg, M. (2023)
+`Inference-time intervention: eliciting truthful answers from a language model',
+in \textit{Advances in Neural Information Processing Systems (NeurIPS)}.
+
+\bibitem[Marks and Tegmark(2024)]{marks2024}
+Marks, S. and Tegmark, M. (2024) `The geometry of truth: emergent linear
+structure in large language model representations of true/false datasets', in
+\textit{Conference on Language Modeling (COLM)}.
+
+\bibitem[McDougall(2024)]{arena2024}
+McDougall, C. (2024) \textit{ARENA 3.0: Alignment Research Engineer
+Accelerator}. Available at: \url{https://github.com/callummcdougall/ARENA_3.0}
+(Accessed: 2 August 2026).
+
+\bibitem[McKenzie et al.(2025)]{mckenzie2025}
+McKenzie, A., Pawar, U., Blandfort, P., Bankes, W., Krueger, D., Lubana, E.S.
+and Krasheninnikov, D. (2025) `Detecting high-stakes interactions with
+activation probes', \textit{arXiv preprint} arXiv:2506.10805.
+
+\bibitem[Meng et al.(2022)]{meng2022}
+Meng, K., Bau, D., Andonian, A. and Belinkov, Y. (2022) `Locating and editing
+factual associations in GPT', in \textit{Advances in Neural Information
+Processing Systems (NeurIPS)}.
+
+\bibitem[Pacchiardi et al.(2024)]{pacchiardi2024}
+Pacchiardi, L., Chan, A.J., Mindermann, S., et al. (2024) `How to catch an AI
+liar: lie detection in black-box LLMs by asking unrelated questions', in
+\textit{International Conference on Learning Representations (ICLR)}.
+
+\bibitem[Perez et al.(2023)]{perez2023}
+Perez, E., Ringer, S., Luko\v{s}i\=ut\.e, K., et al. (2023) `Discovering language
+model behaviors with model-written evaluations', in \textit{Findings of ACL
+2023}, pp. 13387--13434.
+
+\bibitem[Rimsky et al.(2024)]{rimsky2024}
+Rimsky, N., Gabrieli, N., Schulz, J., Tong, M., Hubinger, E. and Turner, A.
+(2024) `Steering Llama 2 via contrastive activation addition', in
+\textit{Proceedings of ACL 2024}, pp. 15504--15522.
+
+\bibitem[Scheurer et al.(2023)]{scheurer2023}
+Scheurer, J., Balesni, M. and Hobbhahn, M. (2023) `Large language models can
+strategically deceive their users when put under pressure',
+\textit{arXiv preprint} arXiv:2311.07590.
+
+\bibitem[Sharma et al.(2023)]{sharma2023}
+Sharma, M., Tong, M., Korbak, T., et al. (2023) `Towards understanding sycophancy
+in language models', \textit{arXiv preprint} arXiv:2310.13548.
+
+\bibitem[Taori et al.(2023)]{taori2023}
+Taori, R., Gulrajani, I., Zhang, T., et al. (2023) \textit{Stanford Alpaca: an
+instruction-following LLaMA model}. Available at:
+\url{https://github.com/tatsu-lab/stanford_alpaca} (Accessed: 2 August 2026).
+
+\bibitem[Vig et al.(2020)]{vig2020}
+Vig, J., Gehrmann, S., Belinkov, Y., et al. (2020) `Investigating gender bias in
+language models using causal mediation analysis', in \textit{Advances in Neural
+Information Processing Systems (NeurIPS)}.
+
+\bibitem[Zou et al.(2023)]{zou2023}
+Zou, A., Phan, L., Chen, S., et al. (2023) `Representation engineering: a
+top-down approach to AI transparency', \textit{arXiv preprint} arXiv:2310.01405.
+
+\end{thebibliography}
+
+%=======================================================================
+\appendices
+
+\section{Full Detection Results}
+Complete AUROC table with bootstrap 95\% confidence intervals and TPR at 1\%
+FPR for all five probe cells $\times$ all evaluation sets, as exported to
+\texttt{exported\_probes/*\_detection.csv}.
+\TODO{paste the three CSVs as a formatted table; they are already generated.}
+
+\section{Full Dose--Response Curves}
+NIE, judge behaviour and judge coherence at each of the seven coefficients, for
+every direction and evaluation set, as exported to
+\texttt{exported\_probes/*\_steering\_full.json}.
+\TODO{paste as three tables.}
+
+\section{Reproducibility}
+Model: \texttt{meta-llama/Llama-3.1-8B-Instruct}, 8-bit, seed 42. Hardware:
+one NVIDIA RTX 5090 (32\,GB). Selected layers and blocks as
+Table~\ref{tab:config}. Data provenance, exact prompts, token masks and
+per-example token counts are documented in \texttt{data\_reference.md} and
+\texttt{sycophancy\_plan.md} \S5c in the project repository; every prompt in
+those files is a real pull from the seed-42 splits.
+
+\section{Statement on the Use of Generative AI Tools}
+\TODO{complete using the template provided by the department, and upload
+separately as required.}
+
+The following is a factual record to be transferred into that template.
+Generative AI tools were used in this project as follows.
+\emph{(i) Code.} An AI coding assistant was used to help implement and refactor
+the \texttt{safety\_probes} package, to write driver-notebook scaffolding, and
+to diagnose defects (for example the double-BOS tokenisation defect described in
+Section~III-C). All code was reviewed and executed by the author, and all
+reported numbers were produced by running that code.
+\emph{(ii) Literature comparison.} An AI assistant was used to cross-check the
+implementation against the source papers section by section, producing the
+divergence list in Section~\ref{sec:divergences}. The author verified each
+divergence against the papers directly.
+\emph{(iii) Writing.} An AI assistant was used to draft and edit prose in this
+report. The research questions, experimental design, results and conclusions are
+the author's own.
+\emph{(iv) As an experimental component.} Claude Haiku 4.5 is used
+\emph{within} the methodology as the LLM judge scoring steered generations
+(Section~III-B); this is a measured component of the system, not a writing aid.
+
+\end{document}

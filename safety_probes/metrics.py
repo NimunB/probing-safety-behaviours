@@ -26,7 +26,16 @@ from torch import Tensor
 from . import runtime
 from .probes import LRProbe, MMProbe, train_attention_probe
 
-N_TOKEN_CAP = 60000  # max flattened token-rows for per-token LR training (memory/tractability)
+#: Cap on flattened token-rows for per-token LR training. **REMOVED 2026-08-02** (was 60000).
+#: The cap was a tractability guard from the 24 GB / older box. It only ever bound on high-stakes
+#: (285,394 rows -> 60,000, i.e. 79% discarded); deception (2,950) and sycophancy (33,296) were
+#: always under it. That made `LR (mean)` a faithful [Apollo §3.1] per-token fit for two behaviours
+#: and a 21% subsample for the third — an asymmetry in the one cell that is supposed to reproduce
+#: Apollo exactly. On the current box (~183 GiB container memory limit per cgroup; 503 GB is the
+#: HOST's total, don't cite it) the uncapped high-stakes fit needs ~9.4 GB fp32 for X plus sklearn
+#: copies (~30-40 GB peak) — comfortably inside the limit. Expect the LR (mean) fit to take
+#: noticeably longer than before on high-stakes (one CPU solve over 285k rows). Set an int to re-enable.
+N_TOKEN_CAP = None
 
 
 # =========================================================================================
@@ -82,9 +91,10 @@ def token_level_dataset(full_acts, token_masks, labels, cap=N_TOKEN_CAP):
         rows.append(sel.float())
         ys.append(t.full((sel.shape[0],), float(labels[j])))
     X, y = t.cat(rows), t.cat(ys)
-    if X.shape[0] > cap:
+    if cap is not None and X.shape[0] > cap:
         idx = t.randperm(X.shape[0], generator=t.Generator().manual_seed(runtime.SEED))[:cap]
         X, y = X[idx], y[idx]
+        print(f"  (per-token rows subsampled to cap={cap})")
     return X, y
 
 

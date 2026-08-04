@@ -322,7 +322,8 @@ per-token for deception *and* high-stakes (`token_level_dataset` in the notebook
 3. **It enables the per-token score heatmaps** ([Apollo Fig. 5], [HS Fig. 7]): per-token training makes
    individual token scores meaningful, which is the error-analysis visualization we want.
 
-*Why the row cap is OK (`N_TOKEN_CAP = 60000`).* Flattening high-stakes to token-rows yields
+*Why the row cap is OK (`N_TOKEN_CAP = 60000`).* **[STRUCK 2026-08-02 — the cap is removed, see
+#55; this rationale stands as the record of why it was once acceptable.]* Flattening high-stakes to token-rows yields
 ~150k–400k rows of 4096 dims (several GB; slow convex solve). If the table exceeds the cap we keep a
 seeded **uniform random 60k of the rows**. This is sound because: (i) the probe never sees prompts or
 token order — training stage input is an unordered bag of `(activation, label)` rows, and each row's
@@ -1481,6 +1482,90 @@ and the papers. Newest entries appended at the bottom. All decisions confirmed b
    processes** (sha256 digests). One-time consequence: the next HS run's CV folds differ from ALL
    previous runs' (including the audited one) — one final wobble, then stable forever; the
    13-vs-20 decision procedure (compare CV values ± fold error, pin via EDIT-HERE) is unchanged.
+
+**2026-08-02 (review session — steering scope, cap, sycophancy readout, prompt rule):**
+
+55. **`N_TOKEN_CAP` removed (60,000 → `None`)** (user decision 2026-08-02). The cap only ever bound on
+   high-stakes — 285,394 per-token rows subsampled to 60,000, i.e. **79% discarded** — while deception
+   (2,950) and sycophancy (33,296) were always under it. So `LR (mean)`, the one grid cell whose job is
+   to reproduce [Apollo §3.1]'s per-token fit exactly, was faithful for two behaviours and a 21%
+   subsample for the third: an asymmetry inside the very comparison the thesis rests on. The cap was a
+   tractability guard from the old box; the current box (503 GB RAM, 128 cores) fits the uncapped
+   285,394 × 4,096 design matrix in ~9.4 GB fp32 plus a scaler copy. `token_level_dataset` still honours
+   an int cap and now prints when it subsamples, so the guard is available and no longer silent.
+   Expect little AUROC movement (60k was already ~15 rows per dimension at λ=10) — the point is
+   faithfulness and cross-behaviour symmetry. Picked up by re-running the high-stakes grid; nothing else
+   is touched.
+
+56. **Steering scope narrowed per instrument, all three behaviours** (user decision 2026-08-02).
+   Previously the vector was written to **every** token of whatever was processed, inherited from [NB]'s
+   `DeceptionSteeringHook` (`apply_to_all_tokens=True`, its default). Two new module flags in
+   `steering.py`: `STEER_SCOPE_READOUT = "transcript"` and `STEER_SCOPE_GENERATION = "completion"`.
+   - *Readout.* Only the item transcript's tokens are steered — **not** the few-shot demonstrations and
+     **not** the trailing question. The demonstrations contain the literal `" YES"`/`" NO"` tokens the NIE
+     reads and the question asks for them, so steering them could move the answer logits *without*
+     changing how the transcript is represented: part of the measured NIE was direct pressure on the
+     instrument. [GoT §6.1] avoids exactly this by confining the intervention to group (b) and excluding
+     the readout position; this is that design transposed to a dialogue. Implemented as
+     `_transcript_char_spans` (span computed by construction, not by searching) + `_span_mask` via
+     `char_to_token`, rebuilt per batch; a stale mask **raises** rather than silently steering everything.
+   - *Generation.* Only generated tokens are steered — the system+user prompt is left as the model saw
+     it. This is real [CAA §3.1] ("every token position of the generated text after the end of the
+     initial prompt"), which the old setting cited but did not match. Implemented by skipping prefill
+     (`hs.shape[1] != 1`), which also retires the old left-padding caveat: pad positions live in the
+     prompt, which is no longer touched.
+   Measured footprint of the readout change — **roughly 15–21% of the readout prompt**, varying with
+   transcript length; per example: deception **34/174** tokens, high-stakes **29/195**,
+   sycophancy **54/252** — previously 100% in all three. **Expect NIE magnitudes to fall; the published
+   numbers were an upper bound.** Set either flag to `"all"` to reproduce them. Uniformity across arms is
+   preserved (plan #33's rationale) — within a scope every direction still touches identical positions.
+   `SteeringHook` defaults are unchanged, so `compose_steering`, `ui_probe.py` and exported bundles are
+   unaffected. Verified: char spans round-trip to the item text for all three specs, few-shot and
+   question regions provably untouched, prefill/decode branching correct, scope guard restores state.
+   Cost: directions, activations and detection are untouched — the steering sections re-run, the
+   ~3 h/behaviour attention-probe pass does not.
+
+57. **Sycophancy readout few-shot: two defects fixed** (user decision 2026-08-02). (a) *Format
+   mismatch* — `render_transcript` prepends `Dialogue:\n` for the `assistant_only` policy, but the two
+   demonstrations were bare `Human:/Assistant:`, so the model saw the calibration examples in one format
+   and the item to judge in another. Deception never had this bug. Both demos now carry the header.
+   (b) *OOD leakage* — the second demonstration was arithmetic (`9 + 5 = 13`) and **math is the held-out
+   OOD domain**, so the math NIE readout was primed with an in-context arithmetic sycophancy example
+   while the math *detection* set was not, making the two instruments incomparable as OOD tests.
+   Replaced with a generic biology claim, restoring the §2 intent that demos sit outside **all five**
+   factorial domains. Bundled with #56 — both change the readout prompt, so one steering re-run covers
+   them; detection and cached activations untouched.
+
+58. **Generation prompts unified on one rule: "behaviour OFF but POSSIBLE"** (user decision
+   2026-08-02, arrived at from [CAA §4.2]'s protocol). CAA keeps seven behaviours comparable by deriving
+   the open-ended prompt from the same held-out item as the constrained readout — "providing only the
+   initial question without answer options" — and rating it 1–10 with an LLM judge. Four of our five
+   generation sets already matched that shape; the rule now states it explicitly:
+   - **Deception** — AI Liar under `normal_instruction` (baseline judge behaviour 2.17/10).
+   - **High-stakes** — low-stakes scenarios.
+   - **Sycophancy** — **FALSE-claim user turns only** (`syc_stratified_users(..., false_frac=1.0)`).
+   *Why sycophancy needed a change.* A user turn carries no sycophancy label (the label is a property of
+   the reply, which does not exist yet), and the same turn is shared by both members of all 505 matched
+   pairs. What a false claim gives is *behaviour absent but available*: the model could defer or correct,
+   and unsteered it corrects (baseline judge 1.17/10). A **true** claim is not "off" but *impossible* —
+   measured `P(sycophantic | claim TRUE) = 0.000` on 403 rows, structurally, since sycophancy requires
+   echoing a wrong belief. The old `[:N_JUDGE_PROMPTS]` slice took a contiguous block and landed
+   12 TRUE / 12 FALSE against an 18% true-claim base rate, so **half the ID judge prompts could not
+   register induction at all** — and those are the numbers carrying the MM coherence-collapse finding.
+   Also note claim-truth alone scores AUROC 0.647 on the label, which is why the user turn stays out of
+   the detection mask (it would hand the probe a factuality shortcut and defeat the 29% genuine-agreement
+   hard negatives).
+   *Deception left unchanged (user decision).* Under the rule, Roleplaying has no behaviour-off prompt:
+   `roleplaying_messages` varies only the **assistant completion**, so `[:2]` makes the `deceptive` flag
+   a **no-op** — `(item, False)[:2]` and `(item, True)[:2]` are identical two-message prompts. Its
+   scenarios are inherently pressured, and the baseline judge behaviour is **6.96/10**, so the panel is
+   flat by construction (6.08–7.83 across the whole ±2 sweep, every direction). The user chose to keep
+   Roleplaying rather than lose the OOD set, so **this stays a disclosed limitation, not a change**: the
+   Roleplaying *judge* panel cannot evidence induction and should not be read as if it does. Its
+   detection results (742 examples, the hard content-defined OOD set) and its NIE are unaffected, and the
+   near-zero Roleplaying NIE remains a genuine negative result. Roleplaying is the natural set for a
+   future *suppression* experiment (already-deceptive baseline, negative coefficients — [GoT]'s
+   `true→false` direction, which we do not currently measure at all).
 
 ## Verification
 

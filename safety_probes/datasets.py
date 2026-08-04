@@ -520,3 +520,73 @@ def load_sycophancy_ood(n_per_class: int = 500) -> Split:
     out = _syc_build(rows, labels, groups, idxs)
     print(f"Sycophancy OOD ({SYC_OOD_DOMAIN}): {len(out)} examples ({int(out.labels.sum())} sycophantic)")
     return out
+
+
+# =========================================================================================
+# Sycophancy generation prompts — claim-truth stratification (added 2026-08-02)
+# =========================================================================================
+#
+# WHY THIS EXISTS. Sycophancy's generation prompts are USER TURNS, and a user turn carries a
+# hidden second dimension the other two behaviours do not have: whether the user's claim is TRUE
+# or FALSE. Steering toward sycophancy can only *induce* anything on a FALSE-claim prompt — if the
+# user is already right, agreeing is the candid answer and there is nothing to override.
+#
+# The previous selection was `list(dict.fromkeys(extra["user"]))[:24]`: the first 24 distinct
+# turns in insertion order, i.e. a contiguous block rather than a sample. Measured 2026-08-02 that
+# gave 12 TRUE / 12 FALSE on the ID split against an 18% TRUE base rate, and 10/14 on math against
+# 30% — so the slice over-sampled true-claim prompts ~2.8x on ID and diluted the judged induction
+# signal by roughly half, with no record of it having happened.
+#
+# TRUE-claim prompts are not waste, though: they are a CONTROL that separates two hypotheses about
+# what the direction encodes. A direction encoding genuine *deference* should barely move a reply
+# the user already agrees with; one encoding mere *agreement* should push it to agree harder. That
+# distinction speaks directly to why sycophancy inverts the read/write dissociation, so we keep
+# both strata, in known proportion, and report them separately rather than pooling them.
+
+
+def syc_claim_truth_by_user(split: Split) -> dict[str, bool]:
+    """Map each distinct user turn -> is the user's claim TRUE?
+
+    Derived from the `ga` (genuine-agreement) flag, which marks rows where the assistant agreed
+    *and* was correct. A prompt therefore has a true claim iff any of its rows is GA.
+    """
+    truth: dict[str, bool] = {}
+    for user, ga in zip(split.extra["user"], split.extra["ga"]):
+        if ga:
+            truth[user] = True
+        else:
+            truth.setdefault(user, False)
+    return truth
+
+
+def syc_stratified_users(split: Split, n: int, false_frac: float = 0.5) -> tuple[list[str], list[bool]]:
+    """`n` distinct user turns, deliberately stratified by claim truth.
+
+    Returns (users, is_true_claim) with the two lists index-aligned, so a caller can score the
+    FALSE-claim subset as the induction measurement and the TRUE-claim subset as the control:
+
+        users, is_true = syc_stratified_users(syc.test, N_JUDGE_PROMPTS)
+        induction = [u for u, tr in zip(users, is_true) if not tr]
+        control   = [u for u, tr in zip(users, is_true) if tr]
+
+    `false_frac` is the target share of FALSE-claim prompts (0.5 = an even split, which maximises
+    the power of the control at the cost of induction n). If a stratum is short, the other backfills
+    and a shortfall is printed — never silently rebalanced.
+    """
+    truth = syc_claim_truth_by_user(split)
+    ordered = list(dict.fromkeys(split.extra["user"]))     # deterministic: dataset order
+    false_users = [u for u in ordered if not truth.get(u, False)]
+    true_users = [u for u in ordered if truth.get(u, False)]
+
+    n_false = min(len(false_users), int(round(n * false_frac)))
+    n_true = min(len(true_users), n - n_false)
+    n_false = min(len(false_users), n - n_true)             # backfill if TRUE stratum was short
+
+    picked = [(u, False) for u in false_users[:n_false]] + [(u, True) for u in true_users[:n_true]]
+    if len(picked) < n:
+        print(f"  ** WARNING: only {len(picked)}/{n} stratified prompts available "
+              f"({len(false_users)} false-claim, {len(true_users)} true-claim in pool) **")
+    base = sum(truth.values()) / max(len(truth), 1)
+    print(f"  judge prompts: {n_false} FALSE-claim (induction) + {n_true} TRUE-claim (control); "
+          f"pool base rate {base:.0%} true-claim")
+    return [u for u, _ in picked], [tr for _, tr in picked]
