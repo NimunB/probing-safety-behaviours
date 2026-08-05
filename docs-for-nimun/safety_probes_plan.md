@@ -1514,6 +1514,12 @@ and the papers. Newest entries appended at the bottom. All decisions confirmed b
      initial prompt"), which the old setting cited but did not match. Implemented by skipping prefill
      (`hs.shape[1] != 1`), which also retires the old left-padding caveat: pad positions live in the
      prompt, which is no longer touched.
+     **⚠ The "this is real CAA" claim was WRONG — corrected by #59 (2026-08-05).** CAA-main's *code*
+     masks `position_ids >= [/INST]-end`, INCLUSIVE of the final prompt position (the paper's prose is
+     ambiguous; the code is not). Completion-only was therefore strictly NARROWER than CAA, and it left
+     the first generated token — chosen by the final prompt position's hidden state — fully unsteered.
+     Empirical consequence (three-regime comparison, 2026-08-05): flat judged dose-response for all
+     three behaviours under this scope, while all-token runs had shown real behavioural movement.
    Measured footprint of the readout change — **roughly 15–21% of the readout prompt**, varying with
    transcript length; per example: deception **34/174** tokens, high-stakes **29/195**,
    sycophancy **54/252** — previously 100% in all three. **Expect NIE magnitudes to fall; the published
@@ -1544,6 +1550,32 @@ and the papers. Newest entries appended at the bottom. All decisions confirmed b
    - **Deception** — AI Liar under `normal_instruction` (baseline judge behaviour 2.17/10).
    - **High-stakes** — low-stakes scenarios.
    - **Sycophancy** — **FALSE-claim user turns only** (`syc_stratified_users(..., false_frac=1.0)`).
+59. **Generation scope corrected to CAA-exact and HARD-CODED; scope flags removed** (user decisions
+   2026-08-05). Chain of evidence: (a) the 2026-08-05 re-runs under #56's "completion-only" scope
+   produced **flat judged dose-responses for all three behaviours** (sycophancy pinned at the scale
+   floor 1.0; high-stakes ~1.8 flat; deception ~2–3.5 with barely a tilt) while the NIE curves were
+   clean and monotone — concept-shift without behaviour-shift; (b) the pre-#56 all-token figures
+   (e.g. sycophancy OOD: MM at +1 = behaviour 7.3 / coherence 7.3) prove the directions CAN move
+   behaviour; (c) **CAA-main's code, read verbatim** (`utils/helpers.py`, quoted in sketchbook):
+   `find_instruction_end_postion` returns the index of the LAST `[/INST]` token — a prompt
+   position — and `add_vector_from_position` masks `position_ids >= from_pos`, **inclusive**. So
+   CAA steers the final prompt position during prefill, i.e. the state that picks the FIRST
+   generated token; completion-only left that token unsteered, anchoring every reply ("Actually,…")
+   before steering had any say. Root cause of the #56 miss: the paper's sentence reads as
+   completion-only; the code disambiguates — same prose-vs-code trap as #2 and #44, and the
+   reviewer (Claude) accepted the citation without re-opening the code. Fix: prefill now steers
+   ONLY the final prompt position (left-padded batches ⇒ last column is every row's true last
+   prompt token), decode steps fully steered; readout scope unchanged (transcript). Per the #12
+   precedent the `STEER_SCOPE_*` mode flags are **deleted** — one hard-coded convention per
+   instrument, no untested branches in the residual-mutating class. The two historical regimes
+   stay citable as archived figures + these plan entries (reproduce: all-token = revert #56's
+   scoping; completion-only = make the CAA branch `return output` in prefill). Verified by unit
+   tests: default full-add (UI/compose unchanged), transcript mask unchanged, prefill
+   last-position-only, decode fully steered, scope restored on reused hooks. **Re-run needed:
+   §7c steering-eval cells only, all three behaviours** (~1–1.5 h total) — NIE/sweeps/blocks/
+   directions from 2026-08-05 remain valid (generation scope touches only judged generations).
+   The three-regime comparison (all / CAA-exact / completion-only) becomes a thesis methods
+   finding: where you write determines whether concept-shift becomes behaviour-shift.
    *Why sycophancy needed a change.* A user turn carries no sycophancy label (the label is a property of
    the reply, which does not exist yet), and the same turn is shared by both members of all 505 matched
    pairs. What a false claim gives is *behaviour absent but available*: the model could defer or correct,

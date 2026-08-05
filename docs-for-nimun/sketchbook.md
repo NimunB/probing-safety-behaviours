@@ -77,3 +77,34 @@ keeping every role's content. Output: server-enforced JSON `{behaviour: 1-10, co
 | Judge model | GPT-4 | Claude Haiku 4.5 |
 
 Both judge **steered generations** (generation runs with the hook active; the judge scores that text). Neither judge feeds layer/block selection.
+
+## CAA-main's steering scope — the code, verbatim (checked 2026-08-05)
+
+Settles what the paper's prose leaves ambiguous ("every token position of the generated text
+after the end of the initial prompt", [CAA §3.1]). From `nrimsky/CAA`, `utils/helpers.py`:
+
+```python
+def add_vector_from_position(matrix, vector, position_ids, from_pos=None):
+    from_id = from_pos
+    if from_id is None:
+        from_id = position_ids.min().item() - 1
+
+    mask = position_ids >= from_id
+    mask = mask.unsqueeze(-1)
+
+    matrix += mask.float() * vector
+    return matrix
+
+def find_instruction_end_postion(tokens, end_str):
+    start_pos = find_last_subtensor_position(tokens, end_str)
+    if start_pos == -1:
+        return -1
+    return start_pos + len(end_str) - 1
+```
+
+Reading: `from_pos` = index of the **last `[/INST]` token — a prompt position** — and the mask is
+`>=`, **inclusive**. So during prefill CAA steers the final prompt position, whose hidden state
+picks the FIRST generated token. A "generated-tokens-only" scope (our short-lived completion-only,
+#56) is strictly narrower and leaves the reply's first word unsteered — which flattened every
+judged dose-response (see plan #59). Our hard-coded generation scope now matches this code: final
+prompt position + all generated tokens.
