@@ -22,6 +22,7 @@ from __future__ import annotations
 import json
 import os
 import re as _re
+import time
 
 from .spec import BehaviourSpec
 
@@ -94,15 +95,22 @@ def judge_generation(spec: BehaviourSpec, prompt: str, response: str) -> dict | 
         f"[Prompt]\n{prompt_for_judge(prompt)}\n\n[Reply]\n{response}\n\n"
         f"Return integers 1-10 for both."
     )
-    try:
-        r = client.messages.create(
-            model=JUDGE_MODEL, max_tokens=128,
-            messages=[{"role": "user", "content": msg}],
-            output_config={"format": {"type": "json_schema", "schema": schema}},
-        )
-        text = next(b.text for b in r.content if b.type == "text")
-        d = json.loads(text)
-        return {"behaviour": int(d["behaviour"]), "coherence": int(d["coherence"])}
-    except Exception as e:
-        print(f"  judge error: {e}")
-        return None
+    # The SDK already retries transient failures back-to-back (max_retries=2 by default), so a
+    # failure reaching us outlasted those. One spaced retry covers overload bursts that the
+    # immediate retries don't — the cause of the occasional 23/24-scored point.
+    for attempt in (1, 2):
+        try:
+            r = client.messages.create(
+                model=JUDGE_MODEL, max_tokens=128,
+                messages=[{"role": "user", "content": msg}],
+                output_config={"format": {"type": "json_schema", "schema": schema}},
+            )
+            text = next(b.text for b in r.content if b.type == "text")
+            d = json.loads(text)
+            return {"behaviour": int(d["behaviour"]), "coherence": int(d["coherence"])}
+        except Exception as e:
+            if attempt == 1:
+                time.sleep(5)
+                continue
+            print(f"  judge error: {e}")
+            return None

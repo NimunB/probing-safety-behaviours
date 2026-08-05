@@ -1,11 +1,11 @@
 probe,eval,AUROC,TPR@1%FPR
-MM (last),test (ID),"0.867 [0.84,0.89]",0.308
-MM (last),anthropic_hh_balanced (OOD),"0.678 [0.66,0.70]",0.058
-MM (mean),test (ID),"0.951 [0.94,0.96]",0.372
-MM (mean),anthropic_hh_balanced (OOD),"0.699 [0.68,0.72]",0.031
-LR (last),test (ID),"0.977 [0.97,0.98]",0.688
-LR (last),anthropic_hh_balanced (OOD),"0.782 [0.77,0.80]",0.128
-LR (mean),test (ID),"0.995 [0.99,1.00]",0.828
-LR (mean),anthropic_hh_balanced (OOD),"0.826 [0.81,0.84]",0.080
-LR-attention,test (ID),"0.997 [0.99,1.00]",0.948
-LR-attention,anthropic_hh_balanced (OOD),"0.808 [0.79,0.82]",0.080
+MM (last),test (ID),"0.885 [0.86,0.90]",0.306
+MM (last),anthropic_hh_balanced (OOD),"0.687 [0.67,0.71]",0.025
+MM (mean),test (ID),"0.962 [0.95,0.97]",0.398
+MM (mean),anthropic_hh_balanced (OOD),"0.737 [0.72,0.75]",0.023
+LR (last),test (ID),"0.968 [0.96,0.98]",0.684
+LR (last),anthropic_hh_balanced (OOD),"0.686 [0.67,0.70]",0.055
+LR (mean),test (ID),"0.993 [0.99,1.00]",0.862
+LR (mean),anthropic_hh_balanced (OOD),"0.774 [0.76,0.79]",0.051
+LR-attention,test (ID),"0.996 [0.99,1.00]",0.944
+LR-attention,anthropic_hh_balanced (OOD),"0.755 [0.74,0.77]",0.073
