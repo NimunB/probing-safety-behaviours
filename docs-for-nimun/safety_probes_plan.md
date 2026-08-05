@@ -1567,6 +1567,29 @@ and the papers. Newest entries appended at the bottom. All decisions confirmed b
    future *suppression* experiment (already-deceptive baseline, negative coefficients — [GoT]'s
    `true→false` direction, which we do not currently measure at all).
 
+**2026-08-05 (pre-second-run tooling):**
+
+59. **Report figures auto-saved by the notebooks; `figures/` reorganised per behaviour** (user
+   request 2026-08-05). Previously every report figure was a manual screenshot into a flat
+   `research-report/figures/`, named by hand — stale-after-rerun by construction, and one slot had
+   already gone wrong once (a mis-saved duplicate, caught by the README audit). Now: `viz.py` gains a
+   module-level figure sink — `save_figures_to("<behaviour>")` (called once per notebook) routes every
+   `save="<slot>"`-tagged matplotlib call to `research-report/figures/<behaviour>/<slot>.png`
+   (dpi 200, tight bbox) as a side effect of rendering, so **every run refreshes the report's
+   images**; a `save=` tag with no sink configured warns loudly rather than saving nowhere.
+   `show_token_heatmaps`/`show_attention_heatmaps` take `save_prefix` and save the FIRST shown
+   example of each class as `<prefix>_<class-slug>.png` — deterministic filenames because splits are
+   seed-fixed. Existing screenshots moved (`git mv`) into the per-behaviour folders under slot names;
+   all 25 `\figslot` paths in `report_v3.tex` repointed and verified to resolve.
+   **Deliberate exception:** `plot_steering_effects` (the dose-response panels) stays plotly with NO
+   auto-save — plotly PNG export needs kaleido + a headless Chrome whose ~15 apt libs die on
+   recycle; option offered, user chose manual screenshots (slot names in `figures/README.md`,
+   rewritten). Consequences: (a) the notebooks' plotting cells changed, so the second run picks the
+   new code up only from a **restarted kernel**; (b) the steering screenshots in the folders are
+   pre-#56/#57/#58 numbers — recapture all seven after the re-run; (c) deception's 2nd run predates
+   this change, so its auto-slots refresh only when its notebook is next executed. Figures are
+   visualization-only, so no cached activation, probe number, or exported bundle is touched.
+
 ## Verification
 
 Runs top-to-bottom on the vast GPU box; 8B loads once. Sanity: CV AUROC > 0.8 ID at the chosen layer;

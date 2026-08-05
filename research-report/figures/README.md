@@ -1,116 +1,65 @@
-# Figures for `report_v3.tex` — exactly what to capture, and what to name it
+# Figures for `report_v3.tex` — auto-saved per behaviour (plan #59)
 
-Drop PNGs into this folder using the **exact filenames** below. `report_v3.tex` wraps every
-`\includegraphics` in `\IfFileExists`, so the report compiles *now* with a labelled placeholder box
-and switches to the real image the moment the file appears. No `.tex` edit needed.
+Since 2026-08-05 the notebooks **save their own report figures**: each driver notebook calls
+`viz.save_figures_to("<behaviour>")` in its imports cell, and every `save=`-tagged plot call then
+writes `figures/<behaviour>/<slot>.png` as a side effect of rendering. **Every full notebook run
+refreshes its behaviour's folder** — no screenshotting, no stale panels, except the one manual case
+below. `report_v3.tex` wraps every `\includegraphics` in `\IfFileExists`, so a missing slot renders
+as a labelled placeholder box and fills in the moment the file appears.
 
-**Capture settings.** Screenshot the figure only (no cell borders, no code). The notebooks set a
-retina DPI bump (`viz._use_style()`, plan #50), so a direct screenshot at 100% zoom is already
-sharp enough for print. Save as PNG. If a panel is very wide, crop to the axes rather than
-downscaling.
+```
+figures/
+  deception/     <- deception.ipynb
+  high_stakes/   <- high_stakes.ipynb
+  sycophancy/    <- sycophancy.ipynb
+```
 
-**Run order.** Capture these *after* the re-run with the 2026-08-02 fixes (transcript-only readout,
-completion-only generation, uncapped high-stakes per-token fit, corrected sycophancy few-shot,
-false-claim judge prompts). The layer-selection and PCA panels are unaffected by those fixes and
-could be captured from the current run, but the dose-response panels **must** come from the new run
-or they will not match the numbers in the text.
+## The one manual exception: `steering_*.png` (dose-response panels)
 
----
+`plot_steering_effects` is the repo's one remaining **plotly** figure; PNG export would need
+kaleido + a headless Chrome (~15 apt libs, wiped on instance recycle) — rejected 2026-08-05.
+**Screenshot these panels yourself** (figure only, 100% zoom, crop to the axes) and drop them into
+the behaviour's folder under these exact names:
 
-## STATUS as of 2026-08-04 — 9 of 12 slots filled
-
-| status | file | note |
-|---|---|---|
-| ✅ | `layers_deception.png` | |
-| ✅ | `layers_highstakes.png` | |
-| ✅ | `layers_sycophancy.png` | |
-| ✅ | `pca_deception.png` | |
-| ❌ | `pca_highstakes.png` | **WRONG IMAGE — recapture.** Byte-identical to `layers_highstakes.png` (same SHA-256). Its 1.82 aspect ratio matches the layer plots; the two real PCA panels are 2.71. You saved the layer-selection plot twice. Capture `high_stakes.ipynb` **cell 11**, both panels. |
-| ✅ | `pca_sycophancy.png` | |
-| ⏳ | `dose_deception.png` | needs the re-run — cell 37, AI Liar (OOD) |
-| ⏳ | `dose_highstakes.png` | needs the re-run — cell 33, Anthropic-HH (OOD) |
-| ⏳ | `dose_sycophancy.png` | needs the re-run — cell 33, math (OOD) |
-| ✅ | `heatmap_deception_deceptive.png` | you supplied a pair instead of one image — **better**, both are now wired side by side in Appendix E, since the point is that the two members differ only in context |
-| ✅ | `heatmap_deception_honest.png` | |
-| ✅ | `roc_deception.png` | now in Appendix E |
-| ✅ | `cosines_deception.png` | now in Appendix E |
-| ✅ | `niesweep_deception.png` | now in Appendix E |
-| ✅ | `attn_sycophancy.png` | now in Appendix E |
-
-**So: recapture `pca_highstakes.png`, and capture the three `dose_*` panels after the re-run.**
-Everything else is in and rendering.
-
-The four "optional" images you supplied were good enough to justify their own **Appendix E:
-Supplementary Figures**, which also freed body space — the report body is now ~7.95 pages, inside the
-8-page limit.
-
----
-
-## Reference — the full slot list
-
-### Fig. `layers` — detection-layer selection (§III-C)
-Pair-aware 5-fold CV AUROC against layer, MM solid + LR overlay, chosen layer marked.
-
-| filename | notebook | cell | note |
-|---|---|---|---|
-| `layers_deception.png` | `deception.ipynb` | 9 | chosen layer 12 |
-| `layers_highstakes.png` | `high_stakes.ipynb` | 9 | chosen layer 13 |
-| `layers_sycophancy.png` | `sycophancy.ipynb` | 9 | chosen layer 19 |
-
-### Fig. `pca` — linear structure (§IV opening)
-The two-panel output of `pca_and_projection_panel`: **left** PCA of centred activations (expect no
-class separation), **right** histogram of projections onto the trained MM direction (expect clean
-bimodal separation). Capture **both panels together** — the contrast is the whole point.
-
-| filename | notebook | cell |
-|---|---|---|
-| `pca_deception.png` | `deception.ipynb` | 12 |
-| `pca_highstakes.png` | `high_stakes.ipynb` | 11 |
-| `pca_sycophancy.png` | `sycophancy.ipynb` | 11 |
-
-### Fig. `dose` — steering dose–response (§IV-E)
-`plot_steering_effects` on the **OOD** eval set for each behaviour: NIE, judge behaviour and judge
-coherence against signed coefficient, three directions overlaid. These cells currently store **no
-image output**, so they must be run.
-
-| filename | notebook | cell | eval set |
-|---|---|---|---|
-| `dose_deception.png` | `deception.ipynb` | 37 | AI Liar (OOD) — *not* the ID panel; ID's NIE is unusable (gap 0.058) |
-| `dose_highstakes.png` | `high_stakes.ipynb` | 33 | Anthropic-HH (OOD) |
-| `dose_sycophancy.png` | `sycophancy.ipynb` | 33 | math (OOD) — the important one: MM's non-monotone peak and coherence cliff |
-
-### Fig. `heatmap` — what the probe reads (§III-B)
-One `show_token_heatmaps` pair from `6a`: the **same** item under both labels if available, so the
-reader can see identical tokens coloured differently. Crop to two rows.
-
-| filename | notebook | cell |
-|---|---|---|
-| `heatmap_deception.png` | `deception.ipynb` | 25 |
-
----
-
-## Optional — only if space allows
-
-| filename | notebook | cell | what |
-|---|---|---|---|
-| `roc_deception.png` | `deception.ipynb` | 19 | ROC curves per eval set |
-| `cosines_deception.png` | `deception.ipynb` | 20 | cosine matrix between probe directions — nice for "do the arms find the same direction?" |
-| `niesweep_deception.png` | `deception.ipynb` | 32 | per-layer NIE sweep, showing the chosen block |
-| `attn_sycophancy.png` | `sycophancy.ipynb` | 24 | attention-probe weights; relevant because LR-attention is sycophancy's best steerer |
-
----
-
-## Cell-number caveat
-
-Indices above are from the notebooks as of 2026-08-02. Adding or removing a cell shifts them. If a
-number looks wrong, find the cell by its call instead:
-
-| figure | call to search for |
+| file | notebook cell (search for `plot_steering_effects`) |
 |---|---|
-| layers | `viz.plot_layer_selection` |
-| pca | `pca_and_projection_panel` |
-| dose | `plot_steering_effects` |
-| heatmap | `show_token_heatmaps` |
-| roc | `plot_roc_curves` |
-| cosines | `probe_direction_cosines` |
-| attn | `show_attention_heatmaps` |
+| `deception/steering_id.png` | `"Deception steering (ID)"` |
+| `deception/steering_ai_liar.png` | `"Deception steering (OOD: AI Liar)"` |
+| `deception/steering_roleplaying.png` | `"Deception steering (OOD: Roleplaying)"` |
+| `high_stakes/steering_id.png` | `"High-stakes steering (ID)"` |
+| `high_stakes/steering_ood.png` | `"High-stakes steering (OOD: Anthropic HH)"` |
+| `sycophancy/steering_id.png` | `"Sycophancy steering (ID)"` |
+| `sycophancy/steering_ood.png` | `"Sycophancy steering (OOD: math)"` |
+
+⚠ The steering screenshots currently in the folders are from the **pre-2026-08-02-fixes run**
+(all-token steering scope, old sycophancy readout). Recapture all seven after the re-run —
+the dose-response numbers in the text will not match them otherwise.
+
+## Auto-saved slots (refreshed by every run)
+
+Wired into `report_v3.tex` (`<b>` = each behaviour folder):
+
+| slot | source call | note |
+|---|---|---|
+| `<b>/layers.png` | `viz.plot_layer_selection(..., save="layers")` | CV AUROC by layer, chosen layer marked |
+| `<b>/pca.png` | `pca_and_projection_panel(..., save="pca")` | both panels in one image |
+| `<b>/cosines.png` | `probe_direction_cosines(..., save="cosines")` | direction cosine matrix |
+| `<b>/niesweep.png` | `viz.plot_nie_bars(..., save="niesweep")` | per-layer NIE, chosen block highlighted |
+| `deception/roc_ai_liar.png` | `plot_roc_curves(..., save="roc_ai_liar")` | the tex's OOD ROC row uses AI Liar for deception |
+| `high_stakes/roc_ood.png`, `sycophancy/roc_ood.png` | `plot_roc_curves(..., save="roc_ood")` | Anthropic-HH / math |
+| `deception/heatmap_deceptive.png` + `heatmap_honest.png` | `show_token_heatmaps(..., save_prefix="heatmap")` | first shown example of each class — with seed-fixed splits that's the same pair every run |
+| `sycophancy/attn_sycophantic.png` | `show_attention_heatmaps(..., save_prefix="attn")` | first sycophantic attention example |
+
+Also saved (not currently in the tex, available for the appendix): `roc_id`, the OOD heatmap/attn
+variants (`heatmap_ood_*`, `attn_ood_*`, deception's `*_ai_liar`/`*_roleplaying`), and the
+class-suffixed pairs for the other behaviours (`heatmap_high_stakes`/`heatmap_low_stakes`,
+`heatmap_sycophantic`/`heatmap_candid`, `attn_deceptive`/`attn_honest`, …). Class suffixes are
+slugged class names (`viz._slug`: lowercase, non-alphanumerics → `_`).
+
+## Conventions
+
+- PNGs at `savefig.dpi=200`, `bbox_inches="tight"` — print-sharp, no zoom fiddling.
+- A `save=` tag with no `save_figures_to()` configured prints a loud skip warning, never saves
+  silently elsewhere; untagged calls (e.g. from `ui_probe.py`) never save.
+- Adding a new slot: tag the plot call with `save="<name>"` in the notebook, reference
+  `figures/<behaviour>/<name>.png` in the tex. Filenames are the contract between the two.

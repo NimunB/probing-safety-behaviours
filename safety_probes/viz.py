@@ -14,6 +14,9 @@ existed — plan M7); pin it in requirements before running on a fresh instance.
 from __future__ import annotations
 
 import html as _html
+import re as _re
+from pathlib import Path
+
 import numpy as np
 import plotly.graph_objects as go
 import matplotlib.pyplot as plt
@@ -62,7 +65,47 @@ def _use_style():
     plt.rcParams.update({"figure.dpi": 130, "savefig.dpi": 200})
 
 
-def plot_layer_selection(cv_mean, cv_std, lr_mean, lr_std, chosen_layer, behaviour):
+# =========================================================================================
+# Report-figure auto-save (plan #59). Each notebook calls save_figures_to("<behaviour>") once;
+# matplotlib plot functions then take save="<slot>" and write research-report/figures/
+# <behaviour>/<slot>.png as a side effect of rendering, so every run refreshes the report's
+# images. EXCEPTION: plot_steering_effects is plotly (PNG export would need kaleido + a headless
+# Chrome — rejected 2026-08-05); the dose-response panels remain manual screenshots, dropped into
+# the same per-behaviour folder under the slot names in research-report/figures/README.md.
+# =========================================================================================
+
+FIGURE_DIR: Path | None = None      # set by save_figures_to(); None = saving disabled (UI, tests)
+
+
+def save_figures_to(behaviour: str) -> Path:
+    """Route every subsequent save=-tagged figure to research-report/figures/<behaviour>/."""
+    global FIGURE_DIR
+    FIGURE_DIR = runtime.PROJECT_ROOT / "research-report" / "figures" / behaviour
+    FIGURE_DIR.mkdir(parents=True, exist_ok=True)
+    print(f"report figures -> {FIGURE_DIR.relative_to(runtime.PROJECT_ROOT)}/")
+    return FIGURE_DIR
+
+
+def _slug(name: str) -> str:
+    """Class name -> filename fragment ('High-stakes' -> 'high_stakes')."""
+    return _re.sub(r"[^a-z0-9]+", "_", name.lower()).strip("_")
+
+
+def _finish(fig, save: str | None):
+    """Save-then-show for matplotlib figures. A save tag with no configured dir warns rather than
+    silently dropping the figure — same fail-visible convention as the cache/provisioning guards."""
+    if save:
+        if FIGURE_DIR is None:
+            print(f"  ** figure save '{save}' requested but save_figures_to() was never called — skipped **")
+        else:
+            out = FIGURE_DIR / f"{save}.png"
+            fig.savefig(out, dpi=200, bbox_inches="tight")
+            shown = out.relative_to(runtime.PROJECT_ROOT) if out.is_relative_to(runtime.PROJECT_ROOT) else out
+            print(f"  [saved] {shown}")
+    plt.show()
+
+
+def plot_layer_selection(cv_mean, cv_std, lr_mean, lr_std, chosen_layer, behaviour, save=None):
     """Per-layer pair-aware CV AUROC: MM (the selector) + LR (robustness overlay), with the chosen
     detection layer marked. matplotlib so it renders on GitHub; y-axis floored at chance (0.5) so
     the curves fill the panel instead of floating in whitespace."""
@@ -84,10 +127,10 @@ def plot_layer_selection(cv_mean, cv_std, lr_mean, lr_std, chosen_layer, behavio
                  f"AUROC {cv_mean[chosen_layer]:.3f}", fontsize=13)
     ax.legend(loc="lower right", framealpha=0.9)
     fig.tight_layout()                   # kills the title bleed
-    plt.show()
+    _finish(fig, save)
 
 
-def plot_nie_bars(nie, steer_block, behaviour):
+def plot_nie_bars(nie, steer_block, behaviour, save=None):
     """NIE (Natural Indirect Effect) for steering ONE layer at a time [GoT §3 group (b)]: the readout
     shift, in class-gap units, from adding the class-mean direction at that layer. The chosen steering
     block is highlighted, the rest muted. matplotlib so it renders on GitHub."""
@@ -103,7 +146,7 @@ def plot_nie_bars(nie, steer_block, behaviour):
     ax.set_xlim(-0.6, len(nie) - 0.4)
     ax.set_title(f"{behaviour} NIE by layer", fontsize=12)
     fig.tight_layout()
-    plt.show()
+    _finish(fig, save)
 
 
 # =========================================================================================
@@ -219,7 +262,7 @@ def show_masked_tokens(text: str, mask: Bool[Tensor, " seq"], title: str):
 # Detection evaluations — ROC + PCA + heatmaps + cosine matrix (cells 24, 26, 27, 28)
 # =========================================================================================
 
-def plot_roc_curves(grid, ev, title):
+def plot_roc_curves(grid, ev, title, save=None):
     """ROC curves for every probe on one eval pack ([NB] §5-style). Area under each curve = the
     AUROC table number. The LEFT EDGE is where TPR@1%FPR lives — a curve that hugs the y-axis
     catches positives before its first false alarms. matplotlib so it renders on GitHub."""
@@ -242,7 +285,7 @@ def plot_roc_curves(grid, ev, title):
     ax.set_title(title, fontsize=12)
     ax.legend(loc="lower right", framealpha=0.9, fontsize=9)
     fig.tight_layout()
-    plt.show()
+    _finish(fig, save)
 
 
 def get_pca_components(acts: Tensor, k=2, return_var=False):
@@ -255,7 +298,7 @@ def get_pca_components(acts: Tensor, k=2, return_var=False):
     return V[:k].T  # [d, k]
 
 
-def pca_and_projection_panel(mean_acts, labels, layer, direction, title):
+def pca_and_projection_panel(mean_acts, labels, layer, direction, title, save=None):
     """Left: unsupervised PCA of the class geometry. Right: projection onto the (supervised) probe
     direction — the axis the probe actually scores on. (Axis + shared-bin fixes: plan #42.)
     matplotlib so it renders on GitHub; the shared explicit bin grid is preserved so bar heights
@@ -296,11 +339,12 @@ def pca_and_projection_panel(mean_acts, labels, layer, direction, title):
 
     fig.tight_layout()
     fig.subplots_adjust(bottom=0.24)     # reserve room for the two under-panel legends
-    plt.show()
+    _finish(fig, save)
 
 
 def render_token_heatmap_mpl(str_tokens, scores, mask, title="", label="", score_value=None,
-                             centering_value=None, score_name="probe score", sequential=False):
+                             centering_value=None, score_name="probe score", sequential=False,
+                             save=None):
     """Static matplotlib twin of visualize_token_scores — colored token boxes that RENDER ON GITHUB.
     (circuitsvis is a JS widget GitHub can't draw, and inline-CSS spans get sanitized away, so a
     rasterized image is the only fallback that survives.) Applies the SAME mask→center→/std→symmetric
@@ -370,7 +414,7 @@ def render_token_heatmap_mpl(str_tokens, scores, mask, title="", label="", score
         head += f"   ground truth label: {label}"
     ax.set_title(head, fontsize=11, loc="left")
     fig.tight_layout()
-    plt.show()
+    _finish(fig, save)
 
 
 def render_token_heatmap_html(str_tokens, scores, mask, title="", label="", score_value=None,
@@ -435,13 +479,17 @@ def render_token_heatmap_html(str_tokens, scores, mask, title="", label="", scor
 
 
 def show_token_heatmaps(texts, det_masks, labels, direction, layer, title, pos_name, neg_name,
-                        n_show=2, score_name="probe score"):
+                        n_show=2, score_name="probe score", save_prefix=None):
     """[NB solutions]-style per-token heatmaps: score all shown examples, compute ONE shared
     centering value from their masked tokens, then render. Colored = detection mask AND not a
     special token (BOS is an attention sink; unmasking it saturates the scale — fix 2026-07-13).
     `score_name` names the quantity in the headers (e.g. "deceptiveness score"); the label shown is
     the dataset's GROUND-TRUTH class, not a prediction. Visualization only — the probe grid scores
-    through probe.score, not this path."""
+    through probe.score, not this path.
+
+    `save_prefix` saves the FIRST shown example of each class as <prefix>_<class-slug>.png (plan
+    #59) — deterministic names for the report's paired figure, e.g. heatmap_deceptive/heatmap_honest
+    (splits are seed-fixed, so "first of each class" is stable across runs)."""
     model, tokenizer = runtime.get_model(), runtime.get_tokenizer()
     special = set(tokenizer.all_special_ids)
     results, pooled = [], []
@@ -455,8 +503,13 @@ def show_token_heatmaps(texts, det_masks, labels, direction, layer, title, pos_n
         results.append((str_tokens, scores, m, i))
         pooled.append(scores[m])
     center = t.cat(pooled).mean().item()
+    saved_classes = set()
     for str_tokens, scores, m, i in results:
         lbl = pos_name if labels[i] == 1 else neg_name
+        save = None
+        if save_prefix and lbl not in saved_classes:
+            saved_classes.add(lbl)
+            save = f"{save_prefix}_{_slug(lbl)}"
         # Header shows the RAW mean projection (comparable across examples); the per-token boxes are
         # standardized (std from this example's mean) for contrast — name them apart to avoid confusion.
         header_name = f"mean {score_name} (raw)"
@@ -465,15 +518,18 @@ def show_token_heatmaps(texts, det_masks, labels, direction, layer, title, pos_n
                                show=True, score_name=header_name)
         render_token_heatmap_mpl(str_tokens, scores, mask=m, score_value=scores[m].mean().item(),
                                  centering_value=center, title=f"{title} - example {i}", label=lbl,
-                                 score_name=header_name)
+                                 score_name=header_name, save=save)
 
 
-def show_attention_heatmaps(full_acts, fmasks, texts, labels, probe_seeds, title, pos_name, neg_name, n_show=2):
+def show_attention_heatmaps(full_acts, fmasks, texts, labels, probe_seeds, title, pos_name, neg_name,
+                            n_show=2, save_prefix=None):
     """WHERE the attention probe looks ([NB] §5; [HS Fig. 7] analogue): per-token softmax weights,
     averaged over the 3 seeds. Weights are >= 0 and sum to 1 over unmasked positions, so intensity
     = share of attention; no centering. For high-stakes the fmask covers ALL real tokens — mass on
-    BOS/template tokens is a finding (attention-sink parking), not a rendering bug."""
+    BOS/template tokens is a finding (attention-sink parking), not a rendering bug.
+    `save_prefix`: first shown example per class -> <prefix>_<class-slug>.png (plan #59)."""
     tokenizer = runtime.get_tokenizer()
+    saved_classes = set()
     for i in range(n_show):
         with t.no_grad():
             w = t.stack([p.get_attention_weights(full_acts[i:i+1], fmasks[i:i+1])[0, :, 0]
@@ -482,16 +538,20 @@ def show_attention_heatmaps(full_acts, fmasks, texts, labels, probe_seeds, title
         str_tokens = [tokenizer.decode(tid) for tid in ids]
         n = len(str_tokens)
         lbl = pos_name if labels[i] == 1 else neg_name
+        save = None
+        if save_prefix and lbl not in saved_classes:
+            saved_classes.add(lbl)
+            save = f"{save_prefix}_{_slug(lbl)}"
         # Interactive: circuitsvis (keeps hover-for-value), highlight in GREEN; plus the GitHub-safe PNG.
         visualize_token_scores(str_tokens, w[:n], mask=fmasks[i][:n], score_value=float(w.max()),
                                title=f"{title} - attention weights, example {i}", label=lbl,
                                show=True, score_name="max attention weight", positive_color="green")
         render_token_heatmap_mpl(str_tokens, w[:n], mask=fmasks[i][:n], score_value=float(w.max()),
                                  title=f"{title} - attention weights, example {i}", label=lbl,
-                                 score_name="max attention weight", sequential=True)
+                                 score_name="max attention weight", sequential=True, save=save)
 
 
-def probe_direction_cosines(grid, mean_acts, last_acts, labels, title):
+def probe_direction_cosines(grid, mean_acts, last_acts, labels, title, save=None):
     """Cosine similarity between the five probe DIRECTIONS at the detection layer — the MECHANISM
     check for the read/write dissociation ([Apollo App. D.1] LR reads best; [GoT Table 2] MM writes
     best). Directions are normalized explicitly (none is unit-norm) and re-oriented negative→positive
@@ -536,7 +596,7 @@ def probe_direction_cosines(grid, mean_acts, last_acts, labels, title):
     ax.set_title(f"{title} — probe direction cosine similarity", fontsize=12)
     fig.colorbar(im, ax=ax, fraction=0.046, pad=0.04)
     fig.tight_layout()
-    plt.show()
+    _finish(fig, save)
 
     # The matrix uses the 3-seed MEAN LR-attention direction, which hides seed disagreement —
     # report it, mirroring the per-seed AUROC print in the grid section.
@@ -556,7 +616,12 @@ def plot_steering_effects(results, title):
       2. judge BEHAVIOUR vs coef — does generated text exhibit the behaviour more as the dose rises?
       3. judge COHERENCE vs coef — the guard: a behaviour rise that coincides with a coherence
          collapse is "steering by breaking the model", not a causal win. Read 2 and 3 together.
-    Panels 2-3 are NaN without ANTHROPIC_API_KEY; panel 1 always fills."""
+    Panels 2-3 are NaN without ANTHROPIC_API_KEY; panel 1 always fills.
+
+    NO save= HERE, deliberately (plan #59): this is the one remaining plotly figure, and plotly PNG
+    export needs kaleido + a headless Chrome (~15 apt libs, wiped on recycle) — rejected 2026-08-05.
+    The dose-response panels are manual screenshots -> research-report/figures/<behaviour>/
+    steering_<eval>.png (slot names in figures/README.md)."""
     fig = make_subplots(rows=1, cols=3, subplot_titles=(
         f"readout NIE", f"judge: behaviour", f"judge: coherence"))
     for method, r in results.items():

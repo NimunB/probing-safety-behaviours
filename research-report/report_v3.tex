@@ -644,11 +644,11 @@ OOD & Liar 54, RP 742 & HH 2{,}984 & math 1{,}000 \\
 
 \begin{figure*}[t]
 \centering
-\figslot{steering_deception_ai_liar.png}{0.84\textwidth}{1.9cm}\\[0pt]
+\figslot{deception/steering_ai_liar.png}{0.84\textwidth}{1.9cm}\\[0pt]
 {\footnotesize (a) \textbf{deception} --- AI Liar (OOD)}\\[3pt]
-\figslot{steering_highstakes_ood.png}{0.84\textwidth}{1.9cm}\\[0pt]
+\figslot{high_stakes/steering_ood.png}{0.84\textwidth}{1.9cm}\\[0pt]
 {\footnotesize (b) \textbf{high-stakes} --- Anthropic-HH (OOD)}\\[3pt]
-\figslot{steering_sycophancy_ood.png}{0.84\textwidth}{1.9cm}\\[0pt]
+\figslot{sycophancy/steering_ood.png}{0.84\textwidth}{1.9cm}\\[0pt]
 {\footnotesize (c) \textbf{sycophancy} --- math (OOD)}
 \caption{\textbf{Steering, out-of-distribution.} One row per behaviour, each carrying three panels:
 \emph{readout NIE} (left), \emph{judge: behaviour} (centre), \emph{judge: coherence} (right), against
@@ -675,7 +675,7 @@ the classes, a topic confound would be the leading explanation.
 
 \begin{figure}[t]
 \centering
-\figslot{layers_highstakes.png}{0.96\columnwidth}{2.1cm}
+\figslot{high_stakes/layers.png}{0.96\columnwidth}{2.1cm}
 \caption{\textbf{Detection-layer selection, high-stakes.} Pair-aware 5-fold CV AUROC against layer,
 mass-mean as selector with a logistic-regression overlay as a robustness check, chosen layer marked.
 \emph{Why high-stakes.} Its curve has a genuine peak, so the argmax is meaningful; deception's
@@ -688,7 +688,7 @@ are in Appendix~E-A.}
 
 \begin{figure*}[t]
 \centering
-\figslot{pca_deception.png}{0.72\textwidth}{2.0cm}
+\figslot{deception/pca.png}{0.72\textwidth}{2.0cm}
 \caption{\textbf{Linear structure, deception, at the detection layer.} \emph{Left:} PCA of centred activations, showing no class
 separation. \emph{Right:} projections onto the trained mass-mean direction, showing clean
 bimodal separation. \emph{Why both panels.} Separation under unsupervised PCA would suggest the
@@ -703,9 +703,9 @@ direction that content variance swamps. High-stakes and sycophancy are in Append
 \begin{figure*}[t]
 \centering
 \begin{tabular}{@{}c@{\hspace{1.5mm}}c@{\hspace{1.5mm}}c@{}}
-\figslot{roc_deception_ood.png}{0.32\textwidth}{2.4cm} &
-\figslot{roc_highstakes_ood.png}{0.32\textwidth}{2.4cm} &
-\figslot{roc_sycophancy_ood.png}{0.32\textwidth}{2.4cm} \\[1pt]
+\figslot{deception/roc_ai_liar.png}{0.32\textwidth}{2.4cm} &
+\figslot{high_stakes/roc_ood.png}{0.32\textwidth}{2.4cm} &
+\figslot{sycophancy/roc_ood.png}{0.32\textwidth}{2.4cm} \\[1pt]
 {\footnotesize (a) deception: AI Liar} & {\footnotesize (b) high-stakes: Anthropic-HH} &
 {\footnotesize (c) sycophancy: math} \\
 \end{tabular}
@@ -719,7 +719,7 @@ logistic-regression family leads in (a) and (b), mass-mean in (c).}
 
 \begin{figure}[t]
 \centering
-\figslot{cosines_deception.png}{0.84\columnwidth}{2.1cm}
+\figslot{deception/cosines.png}{0.84\columnwidth}{2.1cm}
 \caption{Cosine similarity between the five deception probe directions. This addresses the obvious
 objection to the whole comparison, that the arms might be finding the \emph{same} direction and
 differing only in scale, in which case ``which steers better'' would be a units artefact. Cosines well
@@ -762,8 +762,8 @@ LR-attention & 1.000 & 0.989 & 0.657 \\
 
 \begin{figure}[t]
 \centering
-\figslot{heatmap_deception_deceptive.png}{0.92\columnwidth}{1.6cm}\\[3pt]
-\figslot{heatmap_deception_honest.png}{0.92\columnwidth}{1.6cm}
+\figslot{deception/heatmap_deceptive.png}{0.92\columnwidth}{1.6cm}\\[3pt]
+\figslot{deception/heatmap_honest.png}{0.92\columnwidth}{1.6cm}
 \caption{\textbf{Per-token probe scores, one deception pair:} deceptive persona (top), honest twin
 (bottom) --- the mask of §III-B made visible, since only assistant-content tokens are scored.
 \emph{Why a pair rather than one example.} The two members share an identical user turn and the same
@@ -815,7 +815,7 @@ detection layer (19) is consistent: the readable site is not the writable one.
 
 \begin{figure}[t]
 \centering
-\figslot{niesweep_deception.png}{0.94\columnwidth}{2.1cm}
+\figslot{deception/niesweep.png}{0.94\columnwidth}{2.1cm}
 \caption{Per-layer NIE for deception, one layer steered at a time; the selected five-layer block is the
 contiguous window of maximum summed causal effect. This is the write-side analogue of
 Fig.~\ref{fig:layers}, and the contrast between the two is the point: the causal band (15--19) sits
@@ -1150,8 +1150,8 @@ Counterpart to Fig.~\ref{fig:layers}, which shows high-stakes.
 
 \begin{figure}[H]
 \centering
-\figslot{layers_deception.png}{0.96\columnwidth}{1.8cm}\\[4pt]
-\figslot{layers_sycophancy.png}{0.96\columnwidth}{1.8cm}
+\figslot{deception/layers.png}{0.96\columnwidth}{1.8cm}\\[4pt]
+\figslot{sycophancy/layers.png}{0.96\columnwidth}{1.8cm}
 \caption{\textbf{Deception (top) and sycophancy (bottom).} Pair-aware 5-fold CV AUROC against layer,
 mass-mean as selector with a logistic-regression overlay. \emph{Why included.} The body shows
 high-stakes because its curve has a clear peak; these two show the range of shapes the same procedure
@@ -1167,8 +1167,8 @@ Counterpart to Fig.~\ref{fig:pca}, which shows deception.
 
 \begin{figure}[H]
 \centering
-\figslot{pca_highstakes.png}{0.96\columnwidth}{1.6cm}\\[4pt]
-\figslot{pca_sycophancy.png}{0.96\columnwidth}{1.6cm}
+\figslot{high_stakes/pca.png}{0.96\columnwidth}{1.6cm}\\[4pt]
+\figslot{sycophancy/pca.png}{0.96\columnwidth}{1.6cm}
 \caption{\textbf{High-stakes (top) and sycophancy (bottom).} PCA of centred activations (left of each
 pair) beside projections onto the trained direction (right). \emph{Why included.} To show the
 PCA-flat/projection-separated pattern is not specific to deception. \emph{What to look for.}
@@ -1184,8 +1184,8 @@ Counterpart to Fig.~\ref{fig:cos}, which shows deception.
 
 \begin{figure}[H]
 \centering
-\figslot{cosines_highstakes.png}{0.72\columnwidth}{1.8cm}\\[4pt]
-\figslot{cosines_sycophancy.png}{0.72\columnwidth}{1.8cm}
+\figslot{high_stakes/cosines.png}{0.72\columnwidth}{1.8cm}\\[4pt]
+\figslot{sycophancy/cosines.png}{0.72\columnwidth}{1.8cm}
 \caption{\textbf{High-stakes (top) and sycophancy (bottom).} Pairwise cosine similarity between the
 five probe directions. \emph{Why included.} The whole comparison presumes the arms find
 \emph{different} directions; if they were near-collinear, ``which steers better'' would reduce to a
@@ -1201,7 +1201,7 @@ features, which narrows the space of explanations.}
 
 \begin{figure*}[t]
 \centering
-\figslot{attn_sycophancy.png}{0.94\textwidth}{2.0cm}
+\figslot{sycophancy/attn_sycophantic.png}{0.94\textwidth}{2.0cm}
 \caption{\textbf{Attention-probe weights, sycophancy.} A softmax over the masked positions only, so
 weights sum to one within the mask and are comparable across examples. \emph{Why included.} The
 attention direction is sycophancy's \emph{best} steerer and the only one with a monotone steering
@@ -1218,8 +1218,8 @@ Counterpart to Fig.~\ref{fig:nie}, which shows deception.
 
 \begin{figure}[H]
 \centering
-\figslot{niesweep_highstakes.png}{0.96\columnwidth}{1.8cm}\\[4pt]
-\figslot{niesweep_sycophancy.png}{0.96\columnwidth}{1.8cm}
+\figslot{high_stakes/niesweep.png}{0.96\columnwidth}{1.8cm}\\[4pt]
+\figslot{sycophancy/niesweep.png}{0.96\columnwidth}{1.8cm}
 \caption{\textbf{High-stakes (top) and sycophancy (bottom).} Per-layer NIE with one layer steered at a
 time; the selected block is the contiguous five-layer window of maximum summed effect. \emph{Why
 included.} Together with deception these show whether the read/write layer offset is a property of the
@@ -1236,11 +1236,11 @@ Counterpart to Fig.~\ref{fig:steer}, which shows the out-of-distribution sets.
 
 \begin{figure*}[t]
 \centering
-\figslot{steering_deception_id.png}{0.80\textwidth}{1.8cm}\\[1pt]
+\figslot{deception/steering_id.png}{0.80\textwidth}{1.8cm}\\[1pt]
 {\footnotesize (a) \textbf{deception}, ID: judge columns empty by design}\\[5pt]
-\figslot{steering_highstakes_id.png}{0.80\textwidth}{1.8cm}\\[1pt]
+\figslot{high_stakes/steering_id.png}{0.80\textwidth}{1.8cm}\\[1pt]
 {\footnotesize (b) \textbf{high-stakes}, ID}\\[5pt]
-\figslot{steering_sycophancy_id.png}{0.80\textwidth}{1.8cm}\\[1pt]
+\figslot{sycophancy/steering_id.png}{0.80\textwidth}{1.8cm}\\[1pt]
 {\footnotesize (c) \textbf{sycophancy}, ID}
 \caption{\textbf{Steering, in-distribution.} Panels as Fig.~\ref{fig:steer}: readout NIE, judge
 behaviour, judge coherence. \emph{Why in the appendix rather than the body.} Two independent reasons.
@@ -1259,7 +1259,7 @@ magnitudes here should not be compared with them.}
 
 \begin{figure*}[t]
 \centering
-\figslot{steering_deception_roleplaying.png}{0.94\textwidth}{2.0cm}
+\figslot{deception/steering_roleplaying.png}{0.94\textwidth}{2.0cm}
 \caption{\textbf{Steering deception on roleplaying, the second out-of-distribution set.} \emph{Why
 included.} Deception is the only behaviour with two out-of-distribution sets, deliberately of different
 kinds: AI Liar is context-defined, with byte-identical answers across labels, while roleplaying is
