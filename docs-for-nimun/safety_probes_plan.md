@@ -1621,6 +1621,32 @@ and the papers. Newest entries appended at the bottom. All decisions confirmed b
    pre-#56/#57/#58 numbers — recapture all seven after the re-run; (c) deception's 2nd run predates
    this change, so its auto-slots refresh only when its notebook is next executed. Figures are
    visualization-only, so no cached activation, probe number, or exported bundle is touched.
+60. **FINAL steering-scope convention — "steer the item, never the apparatus"; whole-item
+   generation restored** (user's insight, decided 2026-08-05; supersedes #59's generation scope,
+   which lived for ~3 hours). The sycophancy CAA-exact re-run answered #59's open question:
+   judged behaviour stayed at the floor on BOTH eval sets (max 1.33), and the coherence data
+   sharpened it — **MM shattered coherence at |coef|≥1 (9.4 → 1.2) without ever caving; LR-family
+   kept full coherence headroom (~8) through ±2 and stayed behaviourally inert** while its NIE
+   climbed monotonically to 0.8. Combined with the all-token evidence (sycophancy OOD: MM +1 =
+   behaviour 7.3 / coherence 7.3), the three-regime ablation shows behavioural steering in this
+   setting requires the PROMPT's representation to move with the completion — steered generation
+   over an unsteered context is internally inconsistent (breaks or is ignored).
+   **The rule**: the readout steers only the item transcript (the few-shot demos and question are
+   the measurement apparatus — #56, unchanged); generation steers EVERYTHING (full prompt +
+   completion), because the generation prompt contains no apparatus — the judge reads text
+   out-of-band. The deviation from CAA-main's `[/INST]`-onward convention is therefore
+   **evidence-based**, not aesthetic: we measured their exact scope (code-verified, #59) and it
+   does not move behaviour at calibrated doses here. Their setting differs (raw unnormalized
+   vectors, A/B-derived directions, Llama-2) — we do not claim their results are wrong, only that
+   their scope does not transfer to our calibrated mean-gap vectors on Llama-3.1.
+   Implementation: the #59 CAA-prefill branch and `in_generation`/`_generation_scope` machinery
+   are DELETED — the hook is back to two behaviours only (readout positions-mask, else full add);
+   verified by unit tests (full add at prefill+decode, transcript mask + fail-loud intact,
+   machinery absent). Docs aligned: data_reference scope box (three-regime table), sycophancy_plan
+   §5c, all three notebooks' §7c markdown, sketchbook outcome note. Completion-scope ablation data
+   archived in `research-report/figures/scope_ablation/` with README. **Re-run status**: deception
+   + high-stakes re-run once under this final convention (their kernels never ran #59 code);
+   sycophancy needs one more §7c pass (its CAA-exact results are the banked ablation arm).
 
 ## Verification
 

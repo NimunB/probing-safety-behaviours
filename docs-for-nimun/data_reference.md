@@ -12,13 +12,14 @@ a 🟣 block with *no* highlight means nothing in the shown text is steered.
 >
 > Steering used to be applied to **every** token of whatever was processed, inherited from [NB]'s
 > `DeceptionSteeringHook` (`apply_to_all_tokens=True`, its default). It is now narrowed per
-> instrument, for **all three behaviours** (`steering.STEER_SCOPE_READOUT` /
-> `STEER_SCOPE_GENERATION`):
+> instrument, for **all three behaviours** (hard-coded in `steering.py` — the scope flags were
+> removed, plan #59/#60). FINAL convention (2026-08-05, #60) — one rule: **steer the item, never
+> the measurement apparatus**:
 >
-> | instrument | steered now | steered before |
-> |---|---|---|
-> | **NIE readout** | the **item transcript only** — not the few-shot demonstrations, not the trailing question | the whole prompt |
-> | **generation** | the **completion only** — the system+user prompt is untouched | prompt + completion |
+> | instrument | steered (FINAL, #60) | 2026-08-02..05 interim | original |
+> |---|---|---|---|
+> | **NIE readout** | the **item transcript only** — not the few-shot demonstrations, not the trailing question (they ARE the apparatus) | same | the whole prompt |
+> | **generation** | **everything** — full prompt + completion (no apparatus present; the judge reads text out-of-band) | completion only — which left the first generated token unsteered and flattened every judged dose-response (#59 evidence) | prompt + completion |
 >
 > **Why the readout changed.** The few-shot demonstrations contain the literal `" YES"`/`" NO"`
 > tokens the NIE reads, and the question asks for them. Steering those can move the answer logits

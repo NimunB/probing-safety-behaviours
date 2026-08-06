@@ -47,21 +47,24 @@ from .spec import BehaviourSpec
 #   " YES"/" NO" tokens the NIE reads, so steering them would be direct pressure on the
 #   instrument; [GoT §6.1] excludes the readout position for exactly this reason.
 #
-# GENERATION (CAA-exact scope): write to the FINAL PROMPT POSITION during prefill plus every
-#   generated token. Verified against CAA-main's code (utils/helpers.py, quoted in
-#   docs-for-nimun/sketchbook.md): `find_instruction_end_postion` returns the LAST token of
-#   `[/INST]` — a prompt position — and `add_vector_from_position` masks `position_ids >=
-#   from_pos`, INCLUSIVE. The final prompt position is the state that picks the first generated
-#   token; skipping it (the short-lived "completion-only" scope, 2026-08-02..05) left the reply's
-#   first word unsteered and flattened every judged dose-response (see plan #59 for the
-#   three-regime evidence and the reproduce-instructions for the two historical scopes).
+# GENERATION (whole-item scope, #60): write to EVERY position — the full prompt (template tags
+#   included) and every generated token. The generation prompt contains no measurement apparatus
+#   (no few-shot, no readout tokens; the judge reads the text later, out-of-band), so there is
+#   nothing to protect. One rule covers both instruments: STEER THE ITEM, NEVER THE APPARATUS.
+#   This deliberately deviates from CAA-main's [/INST]-onward convention, and the deviation is
+#   EVIDENCE-BASED (#59's three-regime ablation): at calibrated doses, CAA-exact and
+#   completion-only scopes left judged behaviour flat for all three behaviours (MM shattered
+#   coherence before caving; LR-family stayed inert with full headroom), while whole-item steering
+#   produced coherent behavioural movement (e.g. sycophancy OOD: MM at +1 = behaviour 7.3 /
+#   coherence 7.3). Interpretation: steered generation over an unsteered context is internally
+#   inconsistent; behaviour follows when the item's whole representation moves together.
 
 
 class SteeringHook:
     """ADDS a per-layer steering vector to a set of layers, over a configurable token scope.
 
     Scope is set by the *instrument*, not the caller: `readout_pdiff` narrows to the transcript
-    span and the generation helpers apply the CAA-exact scope (see the module note above). The
+    span; generation steers every position — whole-item scope (see the module note above). The
     defaults here are all-token, so `compose_steering`, `ui_probe.py` and any exported bundle
     behave exactly as before unless a consumer opts in.
 
@@ -82,9 +85,6 @@ class SteeringHook:
         #: [batch, seq] bool — True where the vector is written. None = every position.
         #: Set per batch by `readout_pdiff`; the seq dim MUST match the forward pass.
         self.positions = positions
-        #: INTERNAL routing, set by `_generation_scope` only: True while inside a generate() call,
-        #: where prefill steers the final prompt position only (CAA-exact — see module note).
-        self.in_generation = False
         self._handles = []
 
     def _make_fn(self, vec):
@@ -103,13 +103,6 @@ class SteeringHook:
                         f"pass has seq={hs.shape[1]}. The mask must be rebuilt per batch.")
                 m = self.positions.to(hs.device).unsqueeze(-1).to(hs.dtype)
                 hs = hs + add * m
-            elif self.in_generation and is_prefill:
-                # CAA-exact (#59): steer ONLY the final prompt position — the state that picks the
-                # first generated token (CAA-main masks `position_ids >= [/INST]-end`, inclusive).
-                # Left-padded batches put every row's true last prompt token in the last column.
-                last = t.zeros(hs.shape[1], 1, dtype=hs.dtype, device=hs.device)
-                last[-1] = 1
-                hs = hs + add * last
             else:
                 hs = hs + add
             return (hs,) + output[1:] if isinstance(output, tuple) else hs
@@ -172,47 +165,23 @@ def calibrate(direction: Tensor, mean_acts_layer: Tensor, labels: Tensor) -> Ten
     return d_hat * gap
 
 
-class _generation_scope:
-    """Mark a hook as inside a generate() call (CAA-exact prefill behavior), then restore.
-
-    Hooks are reused across coefficients and by `nie_layer_sweep`, so the flag must not leak out of
-    the generation path — the readout must keep seeing an unmodified hook.
-    """
-
-    def __init__(self, hook):
-        self.hook, self.prev = hook, None
-
-    def __enter__(self):
-        if self.hook is not None:
-            self.prev = self.hook.in_generation
-            self.hook.in_generation = True
-        return self.hook
-
-    def __exit__(self, *exc):
-        if self.hook is not None:
-            self.hook.in_generation = self.prev
-        return False
-
-
 @t.no_grad()
 def generate_steered(prompt_text: str, hook: SteeringHook | None, max_new_tokens: int = 80) -> str:
     """Greedy generation with an optional steering hook active. Deterministic (do_sample=False),
     so a coefficient of 0 reproduces the baseline exactly.
 
-    STEERING SCOPE (#59, CAA-exact, hard-coded): the final prompt position is steered during
-    prefill and every generated token during decode — matching CAA-main's inclusive
-    `position_ids >= [/INST]-end` mask (verified from their utils/helpers.py).
+    STEERING SCOPE (whole-item, #60): every prompt position and every generated token — see the
+    module scope note for the rule and the evidence.
     """
     model, tokenizer = runtime.get_model(), runtime.get_tokenizer()
     inp = tokenizer(prompt_text, return_tensors="pt", truncation=True, max_length=512).to(model.device)
-    with _generation_scope(hook):
-        handles = hook.enable() if hook is not None else []
-        try:
-            gen = model.generate(**inp, max_new_tokens=max_new_tokens, do_sample=False,
-                                 pad_token_id=tokenizer.eos_token_id)
-        finally:
-            for h in handles:
-                h.remove()
+    handles = hook.enable() if hook is not None else []
+    try:
+        gen = model.generate(**inp, max_new_tokens=max_new_tokens, do_sample=False,
+                             pad_token_id=tokenizer.eos_token_id)
+    finally:
+        for h in handles:
+            h.remove()
     return tokenizer.decode(gen[0][inp["input_ids"].shape[1]:], skip_special_tokens=True).strip()
 
 
@@ -229,27 +198,25 @@ def generate_steered_batch(prompt_texts: list[str], hook: SteeringHook | None,
     wording from the one-at-a-time path — acceptable for the judge, which has no cross-run
     comparability requirement (#44/#47).
 
-    STEERING SCOPE (#59, CAA-exact, hard-coded): as `generate_steered`. Left padding makes the
-    last column every row's true final prompt token, so the prefill add lands correctly for the
-    whole batch; pad positions are never touched."""
+    STEERING SCOPE (whole-item, #60): as `generate_steered`. Pad positions also receive the add,
+    which is harmless — they are attention-masked, so their values never reach a real token."""
     model, tokenizer = runtime.get_model(), runtime.get_tokenizer()
     out: list[str] = []
     old_side = tokenizer.padding_side
     tokenizer.padding_side = "left"
     try:
-        with _generation_scope(hook):
-            handles = hook.enable() if hook is not None else []
-            try:
-                for i in range(0, len(prompt_texts), batch_size):
-                    inp = tokenizer(prompt_texts[i:i + batch_size], return_tensors="pt", padding=True,
-                                    truncation=True, max_length=512).to(model.device)
-                    gen = model.generate(**inp, max_new_tokens=max_new_tokens, do_sample=False,
-                                         pad_token_id=tokenizer.eos_token_id)
-                    n_inp = inp["input_ids"].shape[1]
-                    out.extend(tokenizer.decode(g[n_inp:], skip_special_tokens=True).strip() for g in gen)
-            finally:
-                for h in handles:
-                    h.remove()
+        handles = hook.enable() if hook is not None else []
+        try:
+            for i in range(0, len(prompt_texts), batch_size):
+                inp = tokenizer(prompt_texts[i:i + batch_size], return_tensors="pt", padding=True,
+                                truncation=True, max_length=512).to(model.device)
+                gen = model.generate(**inp, max_new_tokens=max_new_tokens, do_sample=False,
+                                     pad_token_id=tokenizer.eos_token_id)
+                n_inp = inp["input_ids"].shape[1]
+                out.extend(tokenizer.decode(g[n_inp:], skip_special_tokens=True).strip() for g in gen)
+        finally:
+            for h in handles:
+                h.remove()
     finally:
         tokenizer.padding_side = old_side
     return out

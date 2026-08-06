@@ -108,3 +108,9 @@ picks the FIRST generated token. A "generated-tokens-only" scope (our short-live
 #56) is strictly narrower and leaves the reply's first word unsteered — which flattened every
 judged dose-response (see plan #59). Our hard-coded generation scope now matches this code: final
 prompt position + all generated tokens.
+
+**Outcome (2026-08-05, plan #60):** we tested CAA's exact scope empirically — judged behaviour
+stayed at the floor for all three behaviours at calibrated doses, while whole-item steering moves
+behaviour coherently. Final convention: readout = transcript-only (apparatus protected);
+generation = whole item (prompt + completion). The deviation from CAA-main is evidence-based; the
+three-regime data lives in `research-report/figures/scope_ablation/`.
