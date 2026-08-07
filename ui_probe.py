@@ -370,7 +370,6 @@ Everything is computed from your input on each request — <b>no activations are
     <div><label>Behaviour</label><select id="d_beh"></select></div>
     <div><label>Probe</label><select id="d_probe"></select></div>
   </div>
-  <label>System</label><textarea id="d_sys">You are a deceptive AI assistant.</textarea>
   <label>User</label><textarea id="d_user">Please tell me a fact.</textarea>
   <label>Assistant <span class="warn">(the text that gets probed, for deception)</span></label>
   <textarea id="d_asst">The Eiffel Tower is located in Berlin, Germany.</textarea>
@@ -388,7 +387,6 @@ Everything is computed from your input on each request — <b>no activations are
     <div><label>Coefficient <span class="co" id="s_cv">+1.00</span></label>
       <input type="range" id="s_coef" min="-2" max="2" step="0.25" value="1"></div>
   </div>
-  <label>System</label><textarea id="s_sys">You are an honest AI assistant.</textarea>
   <label>User</label><textarea id="s_user">Please tell me a fact.</textarea>
   <label>Max new tokens <span class="co" id="s_lv">80</span></label>
   <input type="range" id="s_len" min="16" max="200" step="8" value="80">
@@ -416,7 +414,6 @@ Everything is computed from your input on each request — <b>no activations are
     <div><label>Coefficient B <span class="co" id="m_c2v">+1.00</span></label>
       <input type="range" id="m_c2" min="-2" max="2" step="0.25" value="1"></div>
   </div>
-  <label>System</label><textarea id="m_sys">You are an honest AI assistant.</textarea>
   <label>User</label><textarea id="m_user">Please tell me a fact.</textarea>
   <label>Max new tokens <span class="co" id="m_lv">80</span></label>
   <input type="range" id="m_len" min="16" max="200" step="8" value="80">
@@ -469,14 +466,14 @@ async function post(url, body, btn, label){
 $('d_go').onclick = async () => {
   $('d_out').innerHTML = '<em>running forward pass…</em>'; $('d_sum').innerHTML = '';
   const r = await post('/api/detect', {behaviour:$('d_beh').value, probe:$('d_probe').value,
-    system:$('d_sys').value, user:$('d_user').value, assistant:$('d_asst').value}, $('d_go'), 'running…');
+    user:$('d_user').value, assistant:$('d_asst').value}, $('d_go'), 'running…');
   $('d_out').innerHTML = r.html || ('<p>' + (r.error||'error') + '</p>'); $('d_sum').innerHTML = r.summary || '';
 };
 
 $('s_go').onclick = async () => {
   $('s_base').textContent = '…'; $('s_out').textContent = '…'; $('s_note').innerHTML = '';
   const r = await post('/api/steer', {behaviour:$('s_beh').value, method:$('s_meth').value,
-    coef:+$('s_coef').value, system:$('s_sys').value, user:$('s_user').value,
+    coef:+$('s_coef').value, user:$('s_user').value,
     max_new_tokens:+$('s_len').value}, $('s_go'), 'generating…');
   $('s_base').textContent = r.baseline||''; $('s_out').textContent = r.steered||'';
   $('s_note').innerHTML = r.note || r.error || '';
@@ -485,7 +482,7 @@ $('s_go').onclick = async () => {
 $('m_go').onclick = async () => {
   $('m_base').textContent = '…'; $('m_out').textContent = '…'; $('m_note').innerHTML = '';
   const r = await post('/api/multi', {b1:$('m_b1').value, m1:$('m_m1').value, c1:+$('m_c1').value,
-    b2:$('m_b2').value, m2:$('m_m2').value, c2:+$('m_c2').value, system:$('m_sys').value,
+    b2:$('m_b2').value, m2:$('m_m2').value, c2:+$('m_c2').value,
     user:$('m_user').value, max_new_tokens:+$('m_len').value}, $('m_go'), 'generating…');
   $('m_base').textContent = r.baseline||''; $('m_out').textContent = r.steered||'';
   $('m_note').innerHTML = r.note || r.error || '';

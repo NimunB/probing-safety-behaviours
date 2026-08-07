@@ -1,4 +1,4 @@
-# Figures for `report_v3.tex` — auto-saved per behaviour (plan #59)
+# Figures for the report (`report_v4.tex`; `report_v3.tex` predecessor) — auto-saved per behaviour (plan #59)
 
 Since 2026-08-05 the notebooks **save their own report figures**: each driver notebook calls
 `viz.save_figures_to("<behaviour>")` in its imports cell, and every `save=`-tagged plot call then
@@ -12,7 +12,19 @@ figures/
   deception/     <- deception.ipynb
   high_stakes/   <- high_stakes.ipynb
   sycophancy/    <- sycophancy.ipynb
+  ui/            <- manual screenshots (not auto-saved)
 ```
+
+## Manual slots: `ui/` screenshots
+
+Manual captures, not notebook side effects. `report_v4.tex` references:
+
+- `ui/probing/sycophancy.png` — detection tab, live per-token scores (main text, Fig. 4)
+- `ui/high-stakes.png` — single-direction steering demo (appendix)
+- `ui/multi-steering/deception-sycophancy.png` — two directions composed (appendix)
+- `ui/multi-steering/deception-high-stakes.png` — composition failure at high coefficients (appendix)
+
+`ui/steering/EXTENSION-DIF TYPES.png` is not referenced (it is a ChatGPT screenshot, not the UI).
 
 ## The one manual exception: `steering_*.png` (dose-response panels)
 

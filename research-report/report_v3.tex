@@ -633,8 +633,8 @@ been run, so all judge figures are unvalidated.
 \toprule
 & \textbf{Deception} & \textbf{High-stakes} & \textbf{Sycophancy} \\
 \midrule
-Detection layer & 12 & 13 & 19 \\
-Steering block  & 15--19 & 8--12 & 5--9 \\
+Detection layer & 12 & 20 & 19 \\
+Steering block  & 11--15 & 6--10 & 6--10 \\
 Mask policy & assistant & content & assistant \\
 Train / ID test & 488 / 124 & 3{,}000 / 1{,}000 & 2{,}736 / 694 \\
 OOD & Liar 54, RP 742 & HH 2{,}984 & math 1{,}000 \\
@@ -654,18 +654,21 @@ OOD & Liar 54, RP 742 & HH 2{,}984 & math 1{,}000 \\
 \emph{readout NIE} (left), \emph{judge: behaviour} (centre), \emph{judge: coherence} (right), against
 signed coefficient with the three directions overlaid. In-distribution panels are in Appendix~E-F, and
 are weaker evidence: blocks were selected to maximise NIE on training transcripts, and deception's
-in-distribution readout is degenerate (class gap $0.058$). \emph{What to look for.} Mass-mean leads on
-NIE in (a) and (b), which is the write side of the dissociation, but not in (c), where it peaks at
-$+0.5$, collapses by $+1$, and the attention direction alone rises monotonically. Read each
-right-hand panel against its centre one: a behaviour rise coinciding with a coherence fall is steering
-by breaking the model rather than by inducing the behaviour.}
+in-distribution readout is degenerate (class gap $0.058$). \emph{What to look for.} Mass-mean leads
+on NIE in (b), which is the write side of the dissociation; in (a) all three arms are near-flat. In
+(c) the pattern inverts: the attention direction alone rises monotonically, while mass-mean dips
+\emph{negative} at $+1$ ($-0.92$) --- the same coefficient at which its judged behaviour peaks. Read
+each right-hand panel against its centre one: a behaviour rise coinciding with a coherence fall is
+steering by breaking the model rather than by inducing the behaviour.}
 \label{fig:steer}
 \end{figure*}
 
-Table~\ref{tab:config} gives the configuration. The behaviours place their
-detection layers very differently, at 12, 13 and 19 of 32. Sycophancy is the only
-one whose steering block (5--9) lies \emph{below} its detection layer, so its causal
-site is earlier than its readable one.
+Table~\ref{tab:config} gives the configuration. All three causal bands land in the
+lower-middle of the network (layers 6--15) while the detection layers sit at 12, 20
+and 19. For high-stakes and sycophancy the steering block therefore lies well
+\emph{below} the detection layer --- the causal site is earlier than the readable
+one --- while deception's block (11--15) encloses its detection layer, the only
+behaviour where reading and writing peak in the same region.
 
 Across all three behaviours, unsupervised PCA of the detection-layer activations
 shows no class separation while the projection onto the trained direction
@@ -779,28 +782,31 @@ in-distribution figure must be discarded: its class gap is $+0.058$, because the
 model answers ``NO'' to the deception question for \emph{both} classes
 ($PD^{+}=-0.906$, $PD^{-}=-0.964$), and dividing by that inflates the ratio
 roughly seventeenfold. The AI Liar column, on a healthy gap of $1.052$, supports
-the same ranking soundly and is the one relied on. On roleplaying all three
-directions produce NIEs at or below zero: steering does not transfer to the
-harder set, mirroring the detection collapse there.
+the same ranking soundly and is the one relied on. On roleplaying, transfer is weak
+but not absent: mass-mean reaches $+0.13$ at coefficient $1$ and $+0.35$ at $2$,
+the attention direction $+0.09$ and $+0.21$, with plain logistic regression flat ---
+a faint echo of the detection collapse on the same set rather than a full mirror
+of it.
 
 \subsection{High-stakes}
 This is the cleanest case. The logistic-regression family wins 100\% of detection
-columns, with \texttt{LR (mean)} at 0.826 out-of-distribution against mass-mean's
-0.699, and the learned attention probe leads in-distribution at 0.997,
+columns, with \texttt{LR (mean)} at 0.774 out-of-distribution against mass-mean's
+0.737, and the learned attention probe leads in-distribution at 0.996,
 consistent with \citeauthor{mckenzie2025}'s finding that pooling matters. Mass-mean
 then wins 100\% of steering columns, monotonically on the out-of-distribution set
-($0.163 \to 0.560 \to 1.252$ across coefficients $0.5$, $1$, $2$). It also moves
-the judged behaviour furthest at coefficient $1$ ($3.75 \to 5.62$ against LR's
-$4.54$). Read and write disagree cleanly, with both sides well-conditioned.
+($0.230 \to 0.722 \to 1.339$ across coefficients $0.5$, $1$, $2$). It also moves
+the judged behaviour furthest at coefficient $1$ ($4.08 \to 5.88$ against LR's
+$5.00$). Read and write disagree cleanly, with both sides well-conditioned.
 
 \subsection{Sycophancy}
 Sycophancy inverts the pattern on both sides at once. \texttt{MM (last)} is the
 best out-of-distribution detector at 0.879, and the logistic-regression family
-wins \emph{no} detection column. Mass-mean is then among the worst steerers: the
-attention direction is the only one with a clean monotone steering response
-(in-distribution $0.11 \to 0.25 \to 0.51$; math $0.13 \to 0.34 \to 0.48$), while
-mass-mean's curve peaks at coefficient $+0.5$ and collapses by $+1$, which is
-where the verdict is read.
+wins \emph{no} detection column. Mass-mean is then among the worst steerers by the
+readout: the attention direction is the only one with a clean monotone response
+(in-distribution $0.16 \to 0.36 \to 0.81$; math $0.25 \to 0.54 \to 0.77$), while
+mass-mean's curve is non-monotone, dipping \emph{negative} at coefficient $+1$
+($-0.53$ in-distribution, $-0.92$ on math) --- the coefficient at which the verdict
+is read --- before recovering partially at $+2$.
 
 Two of this behaviour's design features explain part of it. Pooling is inverted
 relative to the other behaviours: \texttt{last} beats \texttt{mean} for
@@ -810,7 +816,7 @@ activations are identical across classes. And the label is relational: it depend
 on whether the reply matches a claim that is itself true or false, with 29\% of
 negatives being genuine agreement. A difference-of-means direction over such data
 may capture the surface regularity of agreement, which reads well but is not the
-lever that produces deference. That the steering block (5--9) sits below the
+lever that produces deference. That the steering block (6--10) sits below the
 detection layer (19) is consistent: the readable site is not the writable one.
 
 \begin{figure}[t]
@@ -818,10 +824,11 @@ detection layer (19) is consistent: the readable site is not the writable one.
 \figslot{deception/niesweep.png}{0.94\columnwidth}{2.1cm}
 \caption{Per-layer NIE for deception, one layer steered at a time; the selected five-layer block is the
 contiguous window of maximum summed causal effect. This is the write-side analogue of
-Fig.~\ref{fig:layers}, and the contrast between the two is the point: the causal band (15--19) sits
-well above the detection layer (12), so predictive performance and causal effect do not peak in the
-same place. High-stakes and sycophancy are in Appendix~E; sycophancy inverts the offset, placing its
-causal band \emph{below} its detection layer.}
+Fig.~\ref{fig:layers}. For deception the causal band (11--15) encloses the detection layer (12) ---
+the one behaviour where the two criteria agree on a region. High-stakes and sycophancy are in
+Appendix~E, and there the contrast is the point: their causal bands (6--10 in both) sit well
+\emph{below} their detection layers (20, 19), so predictive performance and causal effect do not peak
+in the same place.}
 \label{fig:nie}
 \end{figure}
 
@@ -850,23 +857,26 @@ Dissociation & holds & holds & \textbf{inverts} \\
 \end{table}
 
 The coherence axis then qualifies the write side. At coefficient $+2$ mass-mean
-degrades generation quality on every behaviour and every evaluation set, judge
-coherence falling from 4.38 to 1.92 on AI Liar, 6.21 to 2.83 on high-stakes
-out-of-distribution, and 6.58 to 1.00 on sycophancy out-of-distribution, while
-logistic-regression and attention directions leave it essentially intact. The
-collapse is a property of the direction, not of a behaviour.
+degrades generation quality on nearly every evaluation set, judge coherence
+falling from 6.21 to 3.92 on high-stakes out-of-distribution and from 8.17 to
+1.00 on sycophancy out-of-distribution, while logistic-regression and attention
+directions leave it essentially intact --- the degradation is largely a property
+of the mass-mean direction. The one exception is AI Liar, where coherence
+\emph{rises} under mass-mean steering (5.08 to 7.04) from an unusually low
+unsteered baseline, a set-specific anomaly worth noting rather than hiding.
 
 Sycophancy also shows why \emph{both} write-side instruments are needed (R2), because
-they disagree there. In-distribution, mass-mean moves the judged behaviour
-substantially at coefficient $+1$ ($1.17 \to 5.67$) but coherence falls from 9.08 to
-3.83 at the same point, the sycophantic-looking text is produced by degradation, and
-the NIE alone would have scored that a success. Out-of-distribution the disagreement
-runs the other way: at $+1$ the judge records a large behaviour rise ($1.00 \to 7.33$)
-with coherence essentially intact ($6.58 \to 7.33$), while the NIE at that coefficient
-is \emph{negative} ($-0.16$). One instrument sees induction, the other sees nothing.
-Neither measurement is therefore sufficient alone. Mass-mean's sycophancy curve is also
-non-monotone throughout: its NIE peaks at $+0.5$ ($0.91$) before collapsing, so no
-single coefficient summarises it.
+they disagree there --- in sign. At coefficient $+1$, mass-mean drives the judged
+behaviour to near-ceiling on both sets ($1.08 \to 9.71$ in-distribution, $1.04 \to
+9.42$ on math) while its NIE at the same coefficient is \emph{negative} ($-0.53$
+and $-0.92$): the judge sees near-total caving, the model's own readout reports
+movement \emph{away} from sycophancy. The coherence panel arbitrates: it falls to
+2.88 in-distribution and 4.17 on math at that coefficient, so the caving text is
+produced under substantial degradation --- strong enough to flip the reply's
+content, strong enough to bend the readout's ruler. Neither measurement is
+sufficient alone, and no single coefficient summarises mass-mean's sycophancy
+curve: inert at $+0.5$, behaviour-maximal but NIE-negative at $+1$, destroyed
+at $+2$.
 
 
 %=======================================================================
@@ -897,8 +907,8 @@ as ``larger effect per unit coefficient, with faster degradation''. This distinc
 is unavailable to \citeauthor{marks2024}'s readout-only design.
 
 \textbf{Detection generalisation is the binding constraint.} Every behaviour loses
-substantial AUROC out-of-distribution: deception 1.000 to 0.722, high-stakes 0.997
-to 0.826, and sycophancy 0.976 to 0.879. At this scale these probes would not
+substantial AUROC out-of-distribution: deception 1.000 to 0.722, high-stakes 0.996
+to 0.774, and sycophancy 0.976 to 0.879. At this scale these probes would not
 support deployment as monitors, consistent with Apollo's conclusion that current
 performance is insufficient as a robust defence.
 
@@ -960,7 +970,7 @@ deception literature.
 \textbf{Explain the sycophancy inversion.} The relational-label hypothesis is
 testable: restricting training to non-genuine-agreement negatives should, if
 correct, move mass-mean toward a causal lever at the cost of detection. The gap
-between layer 19 and layers 5--9 invites a layer-resolved analysis of where
+between layer 19 and layers 6--10 invites a layer-resolved analysis of where
 deference is computed versus where it is legible.
 
 \textbf{Scale, behaviours and mechanism.} Extending to 70B would test whether the
@@ -1223,11 +1233,11 @@ Counterpart to Fig.~\ref{fig:nie}, which shows deception.
 \caption{\textbf{High-stakes (top) and sycophancy (bottom).} Per-layer NIE with one layer steered at a
 time; the selected block is the contiguous five-layer window of maximum summed effect. \emph{Why
 included.} Together with deception these show whether the read/write layer offset is a property of the
-pipeline or of the behaviour. \emph{What to look for.} It is the behaviour. Deception's causal band
-(15--19) sits above its detection layer (12); high-stakes' (8--12) sits just below its own (13),
-overlapping it; sycophancy's (5--9) sits far below its own (19). Only sycophancy inverts the ordering
-substantially, and it is also the only behaviour whose dissociation inverts, a correspondence worth
-testing rather than asserting.}
+pipeline or of the behaviour. \emph{What to look for.} Deception's causal band (11--15) encloses its
+detection layer (12); high-stakes' (6--10) and sycophancy's (6--10) both sit far below their own (20,
+19). Note what this rules out: the offset does \emph{not} track the dissociation inversion ---
+high-stakes has the largest offset yet its dissociation holds, while sycophancy, with the same
+offset, inverts. Layer geometry alone does not explain which behaviours dissociate.}
 \label{fig:app-nie}
 \end{figure}
 

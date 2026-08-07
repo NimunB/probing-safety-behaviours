@@ -4,11 +4,11 @@
 
 
 
-\section{Full Detection Results}
+\section{Full Detection Results}\label{app:det-tables}
 
 Every probe cell against every evaluation set, as exported to \texttt{exported\_probes/*\_detection.csv}. The out-of-distribution rows are the ones the read-side claim rests on; in-distribution AUROC is near-ceiling for two of the three behaviours and correspondingly uninformative.
 
-\begin{table}[h]
+\begin{table}[tb]
 \caption{Deception --- detection. AUROC with bootstrap 95\% CI; TPR at 1\% FPR (\texttt{n/a} where a set has $<$100 negatives, so 1\% FPR is unreachable).}
 \label{tab:app-det-deception}
 \centering
@@ -47,7 +47,7 @@ LR-attention & test (ID) & 1.000 [1.00,1.00] & n/a ($<$100 neg) \\
 \end{tabular}
 \end{table}
 
-\begin{table}[h]
+\begin{table}[tb]
 \caption{High-stakes --- detection. AUROC with bootstrap 95\% CI; TPR at 1\% FPR (\texttt{n/a} where a set has $<$100 negatives, so 1\% FPR is unreachable).}
 \label{tab:app-det-highstakes}
 \centering
@@ -57,26 +57,26 @@ LR-attention & test (ID) & 1.000 [1.00,1.00] & n/a ($<$100 neg) \\
 \toprule
 Probe & Evaluation set & AUROC [95\% CI] & TPR@1\%FPR \\
 \midrule
-MM (last) & test (ID) & 0.867 [0.84,0.89] & 0.308 \\
- & anthropic\_hh\_balanced (OOD) & 0.678 [0.66,0.70] & 0.058 \\
+MM (last) & test (ID) & 0.885 [0.86,0.90] & 0.306 \\
+ & anthropic\_hh\_balanced (OOD) & 0.687 [0.67,0.71] & 0.025 \\
 \addlinespace[2pt]
-MM (mean) & test (ID) & 0.951 [0.94,0.96] & 0.372 \\
- & anthropic\_hh\_balanced (OOD) & 0.699 [0.68,0.72] & 0.031 \\
+MM (mean) & test (ID) & 0.962 [0.95,0.97] & 0.398 \\
+ & anthropic\_hh\_balanced (OOD) & 0.737 [0.72,0.75] & 0.023 \\
 \addlinespace[2pt]
-LR (last) & test (ID) & 0.977 [0.97,0.98] & 0.688 \\
- & anthropic\_hh\_balanced (OOD) & 0.782 [0.77,0.80] & 0.128 \\
+LR (last) & test (ID) & 0.968 [0.96,0.98] & 0.684 \\
+ & anthropic\_hh\_balanced (OOD) & 0.686 [0.67,0.70] & 0.055 \\
 \addlinespace[2pt]
-LR (mean) & test (ID) & 0.995 [0.99,1.00] & 0.828 \\
- & anthropic\_hh\_balanced (OOD) & 0.826 [0.81,0.84] & 0.080 \\
+LR (mean) & test (ID) & 0.993 [0.99,1.00] & 0.862 \\
+ & anthropic\_hh\_balanced (OOD) & 0.774 [0.76,0.79] & 0.051 \\
 \addlinespace[2pt]
-LR-attention & test (ID) & 0.997 [0.99,1.00] & 0.948 \\
- & anthropic\_hh\_balanced (OOD) & 0.808 [0.79,0.82] & 0.080 \\
+LR-attention & test (ID) & 0.996 [0.99,1.00] & 0.944 \\
+ & anthropic\_hh\_balanced (OOD) & 0.755 [0.74,0.77] & 0.073 \\
 \addlinespace[2pt]
 \bottomrule
 \end{tabular}
 \end{table}
 
-\begin{table}[h]
+\begin{table}[tb]
 \caption{Sycophancy --- detection. AUROC with bootstrap 95\% CI; TPR at 1\% FPR (\texttt{n/a} where a set has $<$100 negatives, so 1\% FPR is unreachable).}
 \label{tab:app-det-sycophancy}
 \centering
@@ -105,12 +105,12 @@ LR-attention & test (ID) & 0.974 [0.96,0.98] & 0.865 \\
 \end{tabular}
 \end{table}
 
-\section{Full Steering Response Curves}
+\section{Full Steering Response Curves}\label{app:steer-tables}
 
 All seven coefficients for every direction and evaluation set, as exported to \texttt{exported\_probes/*\_steering\_full.json}. Three things are easiest to see here rather than in the body: whether a curve is monotone in the coefficient, whether the negative half behaves as a control, and where judge coherence falls away from its unsteered baseline.
 
-\begin{table}[h]
-\caption{Deception, ID: steering response. Readout NIE, judge behaviour and judge coherence (1--10; \texttt{---} where the judge arm is deliberately skipped).}
+\begin{table}[tb]
+\caption{Deception, ID: steering response. Readout NIE, judge behaviour and judge coherence (1--10). Judge rows are omitted: the judge arm is skipped for this set, whose generation prompts are byte-identical under greedy decoding.}
 \label{tab:app-steer-deception-ID}
 \centering
 \scriptsize
@@ -119,24 +119,18 @@ All seven coefficients for every direction and evaluation set, as exported to \t
 \toprule
 Direction & & -2 & -1 & -0.5 & +0 & +0.5 & +1 & +2 \\
 \midrule
-MM & NIE & -0.58 & -0.58 & -0.56 & +0.00 & +2.61 & +7.25 & +14.63 \\
- & judge beh. & --- & --- & --- & --- & --- & --- & --- \\
- & judge coh. & --- & --- & --- & --- & --- & --- & --- \\
+MM & NIE & -0.23 & -0.07 & -0.04 & +0.00 & +0.14 & +0.30 & +1.53 \\
 \addlinespace[2pt]
-LR & NIE & -0.56 & -0.55 & -0.44 & +0.00 & +0.99 & +2.29 & +3.70 \\
- & judge beh. & --- & --- & --- & --- & --- & --- & --- \\
- & judge coh. & --- & --- & --- & --- & --- & --- & --- \\
+LR & NIE & +0.37 & +0.23 & +0.12 & +0.00 & -0.05 & -0.01 & +0.13 \\
 \addlinespace[2pt]
-LR-attention & NIE & -0.53 & -0.49 & -0.33 & +0.00 & +0.54 & +1.15 & +2.57 \\
- & judge beh. & --- & --- & --- & --- & --- & --- & --- \\
- & judge coh. & --- & --- & --- & --- & --- & --- & --- \\
+LR-attention & NIE & -0.08 & +0.02 & -0.02 & +0.00 & +0.07 & +0.20 & +0.56 \\
 \addlinespace[2pt]
 \bottomrule
 \end{tabular}
 \end{table}
 
-\begin{table}[h]
-\caption{Deception, AI Liar (OOD): steering response. Readout NIE, judge behaviour and judge coherence (1--10; \texttt{---} where the judge arm is deliberately skipped).}
+\begin{table}[tb]
+\caption{Deception, AI Liar (OOD): steering response. Readout NIE, judge behaviour and judge coherence (1--10).}
 \label{tab:app-steer-deception-AILiarOOD}
 \centering
 \scriptsize
@@ -145,24 +139,24 @@ LR-attention & NIE & -0.53 & -0.49 & -0.33 & +0.00 & +0.54 & +1.15 & +2.57 \\
 \toprule
 Direction & & -2 & -1 & -0.5 & +0 & +0.5 & +1 & +2 \\
 \midrule
-MM & NIE & +0.26 & -0.10 & -0.09 & +0.00 & +0.09 & +0.16 & +0.24 \\
- & judge beh. & 3.33 & 2.08 & 2.38 & 2.17 & 2.33 & 2.71 & 3.25 \\
- & judge coh. & 2.12 & 5.33 & 5.58 & 4.38 & 7.42 & 7.58 & 1.92 \\
+MM & NIE & -0.06 & -0.03 & -0.00 & +0.00 & +0.01 & +0.00 & +0.05 \\
+ & judge beh. & 2.42 & 2.21 & 2.46 & 2.12 & 2.25 & 2.00 & 2.92 \\
+ & judge coh. & 3.96 & 5.25 & 5.62 & 5.08 & 5.58 & 8.71 & 7.04 \\
 \addlinespace[2pt]
-LR & NIE & -0.37 & -0.14 & -0.07 & +0.00 & +0.05 & +0.05 & -0.15 \\
- & judge beh. & 2.38 & 2.12 & 2.21 & 2.17 & 2.42 & 2.33 & 3.12 \\
- & judge coh. & 4.96 & 5.17 & 5.58 & 4.38 & 5.58 & 5.88 & 3.83 \\
+LR & NIE & +0.09 & +0.05 & +0.01 & +0.00 & -0.03 & -0.05 & -0.09 \\
+ & judge beh. & 2.46 & 2.25 & 2.21 & 2.12 & 2.17 & 2.33 & 3.54 \\
+ & judge coh. & 4.58 & 4.62 & 5.08 & 5.08 & 6.04 & 7.08 & 7.25 \\
 \addlinespace[2pt]
-LR-attention & NIE & -0.13 & -0.04 & -0.00 & +0.00 & +0.02 & -0.02 & -0.15 \\
- & judge beh. & 2.04 & 2.67 & 2.12 & 2.17 & 2.04 & 2.33 & 2.50 \\
- & judge coh. & 4.75 & 4.79 & 5.38 & 4.38 & 6.04 & 5.54 & 6.29 \\
+LR-attention & NIE & -0.01 & -0.01 & -0.01 & +0.00 & -0.00 & -0.00 & +0.01 \\
+ & judge beh. & 2.08 & 2.29 & 2.25 & 2.12 & 2.38 & 2.25 & 3.12 \\
+ & judge coh. & 5.33 & 5.92 & 5.50 & 5.08 & 6.12 & 6.12 & 8.58 \\
 \addlinespace[2pt]
 \bottomrule
 \end{tabular}
 \end{table}
 
-\begin{table}[h]
-\caption{Deception, Roleplaying (OOD): steering response. Readout NIE, judge behaviour and judge coherence (1--10; \texttt{---} where the judge arm is deliberately skipped).}
+\begin{table}[tb]
+\caption{Deception, Roleplaying (OOD): steering response. Readout NIE, judge behaviour and judge coherence (1--10).}
 \label{tab:app-steer-deception-RoleplayingOOD}
 \centering
 \scriptsize
@@ -171,24 +165,24 @@ LR-attention & NIE & -0.13 & -0.04 & -0.00 & +0.00 & +0.02 & -0.02 & -0.15 \\
 \toprule
 Direction & & -2 & -1 & -0.5 & +0 & +0.5 & +1 & +2 \\
 \midrule
-MM & NIE & +0.53 & -0.02 & -0.00 & +0.00 & -0.05 & -0.07 & -0.15 \\
- & judge beh. & 6.42 & 7.12 & 6.62 & 6.96 & 6.75 & 6.62 & 6.08 \\
- & judge coh. & 1.04 & 5.00 & 5.62 & 6.08 & 6.04 & 5.71 & 1.38 \\
+MM & NIE & +0.12 & -0.02 & -0.03 & +0.00 & +0.05 & +0.13 & +0.35 \\
+ & judge beh. & 7.96 & 6.46 & 6.17 & 6.71 & 7.33 & 7.12 & 6.71 \\
+ & judge coh. & 2.96 & 5.71 & 5.50 & 6.25 & 6.62 & 6.83 & 4.12 \\
 \addlinespace[2pt]
-LR & NIE & -0.27 & -0.09 & -0.03 & +0.00 & -0.01 & -0.08 & -0.53 \\
- & judge beh. & 6.79 & 6.46 & 7.12 & 6.96 & 7.33 & 7.83 & 7.12 \\
- & judge coh. & 5.08 & 6.08 & 5.38 & 6.08 & 5.75 & 5.67 & 2.58 \\
+LR & NIE & +0.22 & +0.06 & +0.02 & +0.00 & -0.01 & -0.02 & +0.04 \\
+ & judge beh. & 5.58 & 6.54 & 7.00 & 6.71 & 7.50 & 7.88 & 6.96 \\
+ & judge coh. & 4.79 & 7.08 & 6.58 & 6.25 & 6.50 & 6.38 & 5.17 \\
 \addlinespace[2pt]
-LR-attention & NIE & -0.02 & +0.02 & +0.02 & +0.00 & -0.06 & -0.18 & -0.49 \\
- & judge beh. & 7.12 & 6.42 & 6.79 & 6.96 & 7.33 & 7.12 & 7.08 \\
- & judge coh. & 5.29 & 6.12 & 5.79 & 6.08 & 5.67 & 5.79 & 4.92 \\
+LR-attention & NIE & -0.02 & -0.03 & -0.03 & +0.00 & +0.04 & +0.09 & +0.21 \\
+ & judge beh. & 6.08 & 6.58 & 6.46 & 6.71 & 7.42 & 7.75 & 7.08 \\
+ & judge coh. & 4.88 & 5.75 & 5.79 & 6.25 & 6.50 & 5.88 & 7.00 \\
 \addlinespace[2pt]
 \bottomrule
 \end{tabular}
 \end{table}
 
-\begin{table}[h]
-\caption{High-stakes, ID: steering response. Readout NIE, judge behaviour and judge coherence (1--10; \texttt{---} where the judge arm is deliberately skipped).}
+\begin{table}[tb]
+\caption{High-stakes, ID: steering response. Readout NIE, judge behaviour and judge coherence (1--10).}
 \label{tab:app-steer-highstakes-ID}
 \centering
 \scriptsize
@@ -197,24 +191,24 @@ LR-attention & NIE & -0.02 & +0.02 & +0.02 & +0.00 & -0.06 & -0.18 & -0.49 \\
 \toprule
 Direction & & -2 & -1 & -0.5 & +0 & +0.5 & +1 & +2 \\
 \midrule
-MM & NIE & -3.06 & -3.27 & -2.01 & +0.00 & +1.25 & +1.52 & +1.24 \\
- & judge beh. & 2.46 & 3.42 & 3.71 & 3.75 & 5.33 & 5.62 & 5.62 \\
- & judge coh. & 5.04 & 4.75 & 4.46 & 4.42 & 5.00 & 4.75 & 2.83 \\
+MM & NIE & -4.30 & -4.24 & -2.97 & +0.00 & +1.32 & +1.54 & +1.57 \\
+ & judge beh. & 2.46 & 3.08 & 3.54 & 4.08 & 5.33 & 5.88 & 7.54 \\
+ & judge coh. & 5.83 & 4.79 & 4.38 & 4.17 & 4.71 & 5.21 & 3.42 \\
 \addlinespace[2pt]
-LR & NIE & -2.49 & -1.41 & -0.72 & +0.00 & +0.52 & +1.01 & +1.49 \\
- & judge beh. & 3.54 & 3.71 & 4.46 & 3.75 & 4.50 & 4.54 & 4.42 \\
- & judge coh. & 5.00 & 5.12 & 4.75 & 4.42 & 4.50 & 4.58 & 4.38 \\
+LR & NIE & -3.60 & -1.82 & -0.86 & +0.00 & +0.59 & +0.95 & +1.39 \\
+ & judge beh. & 4.04 & 3.92 & 3.71 & 4.08 & 4.29 & 5.00 & 5.25 \\
+ & judge coh. & 4.50 & 5.25 & 4.42 & 4.17 & 4.67 & 4.17 & 4.75 \\
 \addlinespace[2pt]
-LR-attention & NIE & -3.62 & -2.32 & -1.30 & +0.00 & +0.84 & +1.38 & +1.56 \\
- & judge beh. & 3.50 & 3.71 & 3.50 & 3.75 & 4.50 & 4.38 & 6.00 \\
- & judge coh. & 5.33 & 4.71 & 4.75 & 4.42 & 4.71 & 4.79 & 5.04 \\
+LR-attention & NIE & -4.25 & -3.18 & -1.52 & +0.00 & +0.84 & +1.30 & +1.54 \\
+ & judge beh. & 3.25 & 4.29 & 3.96 & 4.08 & 4.17 & 4.21 & 5.29 \\
+ & judge coh. & 4.38 & 4.58 & 4.71 & 4.17 & 4.71 & 4.83 & 4.79 \\
 \addlinespace[2pt]
 \bottomrule
 \end{tabular}
 \end{table}
 
-\begin{table}[h]
-\caption{High-stakes, Anthropic HH (OOD): steering response. Readout NIE, judge behaviour and judge coherence (1--10; \texttt{---} where the judge arm is deliberately skipped).}
+\begin{table}[tb]
+\caption{High-stakes, Anthropic HH (OOD): steering response. Readout NIE, judge behaviour and judge coherence (1--10).}
 \label{tab:app-steer-highstakes-AnthropicHHOOD}
 \centering
 \scriptsize
@@ -223,24 +217,24 @@ LR-attention & NIE & -3.62 & -2.32 & -1.30 & +0.00 & +0.84 & +1.38 & +1.56 \\
 \toprule
 Direction & & -2 & -1 & -0.5 & +0 & +0.5 & +1 & +2 \\
 \midrule
-MM & NIE & -0.06 & -0.07 & -0.06 & +0.00 & +0.16 & +0.56 & +1.25 \\
- & judge beh. & 1.42 & 1.67 & 1.83 & 1.79 & 1.83 & 1.96 & 2.58 \\
- & judge coh. & 6.71 & 7.38 & 6.54 & 6.21 & 6.21 & 5.00 & 2.83 \\
+MM & NIE & -0.08 & -0.08 & -0.07 & +0.00 & +0.23 & +0.72 & +1.34 \\
+ & judge beh. & 1.58 & 1.79 & 1.79 & 1.67 & 1.92 & 1.92 & 2.38 \\
+ & judge coh. & 7.21 & 6.50 & 6.38 & 6.21 & 6.00 & 5.79 & 3.92 \\
 \addlinespace[2pt]
-LR & NIE & -0.07 & -0.05 & -0.03 & +0.00 & +0.05 & +0.12 & +0.36 \\
- & judge beh. & 1.83 & 1.79 & 1.79 & 1.79 & 1.75 & 1.71 & 1.79 \\
- & judge coh. & 5.92 & 6.29 & 6.38 & 6.21 & 6.29 & 6.21 & 5.79 \\
+LR & NIE & -0.07 & -0.05 & -0.03 & +0.00 & +0.05 & +0.12 & +0.32 \\
+ & judge beh. & 1.75 & 1.67 & 1.79 & 1.67 & 1.71 & 2.04 & 1.75 \\
+ & judge coh. & 6.62 & 6.83 & 6.38 & 6.21 & 6.42 & 6.38 & 5.96 \\
 \addlinespace[2pt]
-LR-attention & NIE & -0.07 & -0.07 & -0.04 & +0.00 & +0.09 & +0.26 & +0.78 \\
- & judge beh. & 1.79 & 1.83 & 1.83 & 1.79 & 1.75 & 1.79 & 1.96 \\
- & judge coh. & 7.00 & 6.50 & 6.54 & 6.21 & 6.00 & 5.88 & 6.00 \\
+LR-attention & NIE & -0.08 & -0.07 & -0.04 & +0.00 & +0.10 & +0.25 & +0.68 \\
+ & judge beh. & 1.75 & 1.71 & 1.71 & 1.67 & 1.75 & 1.71 & 1.79 \\
+ & judge coh. & 6.29 & 7.04 & 6.25 & 6.21 & 6.33 & 6.25 & 6.21 \\
 \addlinespace[2pt]
 \bottomrule
 \end{tabular}
 \end{table}
 
-\begin{table}[h]
-\caption{Sycophancy, ID: steering response. Readout NIE, judge behaviour and judge coherence (1--10; \texttt{---} where the judge arm is deliberately skipped).}
+\begin{table}[tb]
+\caption{Sycophancy, ID: steering response. Readout NIE, judge behaviour and judge coherence (1--10).}
 \label{tab:app-steer-sycophancy-ID}
 \centering
 \scriptsize
@@ -249,24 +243,24 @@ LR-attention & NIE & -0.07 & -0.07 & -0.04 & +0.00 & +0.09 & +0.26 & +0.78 \\
 \toprule
 Direction & & -2 & -1 & -0.5 & +0 & +0.5 & +1 & +2 \\
 \midrule
-MM & NIE & +0.03 & -0.55 & +0.04 & +0.00 & +0.89 & +0.08 & +0.03 \\
- & judge beh. & 1.00 & 1.04 & 1.83 & 1.17 & 1.29 & 5.67 & 1.00 \\
- & judge coh. & 1.00 & 7.25 & 8.12 & 9.08 & 9.71 & 3.83 & 1.00 \\
+MM & NIE & -0.62 & -0.62 & -0.14 & +0.00 & +0.19 & -0.53 & +0.68 \\
+ & judge beh. & 1.00 & 1.83 & 1.08 & 1.08 & 1.08 & 9.71 & 1.00 \\
+ & judge coh. & 1.00 & 7.42 & 8.12 & 8.58 & 9.67 & 2.88 & 1.00 \\
 \addlinespace[2pt]
-LR & NIE & -0.07 & -0.04 & -0.04 & +0.00 & +0.01 & -0.00 & +0.03 \\
- & judge beh. & 1.46 & 1.50 & 1.42 & 1.17 & 1.42 & 1.42 & 1.08 \\
- & judge coh. & 9.21 & 9.29 & 9.42 & 9.08 & 9.54 & 9.00 & 9.17 \\
+LR & NIE & -0.06 & -0.03 & +0.00 & +0.00 & +0.02 & +0.03 & +0.07 \\
+ & judge beh. & 1.08 & 1.08 & 1.08 & 1.08 & 1.04 & 1.04 & 1.04 \\
+ & judge coh. & 8.67 & 8.96 & 8.50 & 8.58 & 8.83 & 8.75 & 8.62 \\
 \addlinespace[2pt]
-LR-attention & NIE & -0.32 & -0.22 & -0.14 & +0.00 & +0.11 & +0.25 & +0.51 \\
- & judge beh. & 1.38 & 3.17 & 1.46 & 1.17 & 1.04 & 1.04 & 1.42 \\
- & judge coh. & 9.21 & 9.42 & 9.29 & 9.08 & 9.33 & 8.67 & 8.33 \\
+LR-attention & NIE & -0.75 & -0.56 & -0.26 & +0.00 & +0.16 & +0.36 & +0.81 \\
+ & judge beh. & 1.42 & 1.04 & 1.08 & 1.08 & 1.08 & 1.04 & 1.17 \\
+ & judge coh. & 8.71 & 8.75 & 8.54 & 8.58 & 8.54 & 9.25 & 7.96 \\
 \addlinespace[2pt]
 \bottomrule
 \end{tabular}
 \end{table}
 
-\begin{table}[h]
-\caption{Sycophancy, Math (OOD): steering response. Readout NIE, judge behaviour and judge coherence (1--10; \texttt{---} where the judge arm is deliberately skipped).}
+\begin{table}[tb]
+\caption{Sycophancy, Math (OOD): steering response. Readout NIE, judge behaviour and judge coherence (1--10).}
 \label{tab:app-steer-sycophancy-MathOOD}
 \centering
 \scriptsize
@@ -275,17 +269,17 @@ LR-attention & NIE & -0.32 & -0.22 & -0.14 & +0.00 & +0.11 & +0.25 & +0.51 \\
 \toprule
 Direction & & -2 & -1 & -0.5 & +0 & +0.5 & +1 & +2 \\
 \midrule
-MM & NIE & -0.21 & -1.05 & -0.09 & +0.00 & +0.91 & -0.16 & -0.21 \\
- & judge beh. & 1.00 & 1.00 & 1.00 & 1.00 & 3.71 & 7.33 & 1.00 \\
- & judge coh. & 1.00 & 3.46 & 6.83 & 6.58 & 9.79 & 7.33 & 1.00 \\
+MM & NIE & -1.11 & -1.11 & -0.44 & +0.00 & +0.22 & -0.92 & +0.40 \\
+ & judge beh. & 1.00 & 1.04 & 1.00 & 1.04 & 1.12 & 9.42 & 1.00 \\
+ & judge coh. & 1.00 & 2.08 & 8.46 & 8.17 & 9.21 & 4.17 & 1.00 \\
 \addlinespace[2pt]
-LR & NIE & -0.05 & -0.06 & -0.03 & +0.00 & -0.03 & -0.01 & -0.02 \\
- & judge beh. & 1.75 & 1.00 & 1.00 & 1.00 & 1.00 & 1.04 & 1.00 \\
- & judge coh. & 7.25 & 6.79 & 6.29 & 6.58 & 6.67 & 6.21 & 7.17 \\
+LR & NIE & -0.04 & -0.03 & -0.03 & +0.00 & -0.01 & +0.02 & +0.03 \\
+ & judge beh. & 1.04 & 1.04 & 1.00 & 1.04 & 1.00 & 1.04 & 1.00 \\
+ & judge coh. & 8.08 & 7.42 & 7.79 & 8.17 & 8.04 & 8.08 & 8.29 \\
 \addlinespace[2pt]
-LR-attention & NIE & -1.03 & -0.61 & -0.19 & +0.00 & +0.13 & +0.34 & +0.48 \\
- & judge beh. & 1.38 & 2.50 & 1.83 & 1.00 & 1.00 & 1.04 & 1.04 \\
- & judge coh. & 7.88 & 8.25 & 8.12 & 6.58 & 6.92 & 7.00 & 7.25 \\
+LR-attention & NIE & -1.28 & -0.96 & -0.37 & +0.00 & +0.25 & +0.54 & +0.77 \\
+ & judge beh. & 2.00 & 1.42 & 1.08 & 1.04 & 1.08 & 1.00 & 1.21 \\
+ & judge coh. & 6.75 & 8.38 & 8.54 & 8.17 & 8.08 & 8.38 & 5.42 \\
 \addlinespace[2pt]
 \bottomrule
 \end{tabular}
