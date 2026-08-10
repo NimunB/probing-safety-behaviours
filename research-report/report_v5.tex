@@ -45,6 +45,33 @@
 
 \renewcommand{\bibsection}{\section*{References}}
 
+% IEEEtran renders \subsubsection ("1)") and \paragraph ("a)") as RUN-IN headings:
+% italic, an auto-appended colon, and the prose continuing on the same line.
+% Redefine both as DISPLAY headings — own line, no colon, numbering unchanged —
+% so prose starts on the next line in normal upright text. (A positive "afterskip"
+% in \@startsection is what makes a heading display-style; IEEEtran's colon is
+% only inserted for run-in headings, so it disappears with the change.)
+\makeatletter
+% The third \@startsection argument indents the HEADING LINE only (1em at the
+% "B.1)" level, 2em at "B.1.a)"); body text below stays flush left.
+\renewcommand{\subsubsection}{\@startsection{subsubsection}{3}{1em}%
+  {1.5ex plus 1.5ex minus 0.5ex}{0.7ex plus 0.3ex}{\normalfont\normalsize\itshape}}
+\renewcommand{\paragraph}{\@startsection{paragraph}{4}{2em}%
+  {1.5ex plus 1.5ex minus 0.5ex}{0.7ex plus 0.3ex}{\normalfont\normalsize\itshape}}
+% Deep levels print their FULL nested path ("B.1)", "B.1.a)") instead of a bare
+% "1)"/"a)", so a heading is locatable without scrolling up. Counters stay
+% automatic — reordering a subsection still renumbers everything below it.
+% IEEEtran displays heading numbers via its own \the...dis macros (the plain
+% \the... forms are used for cross-references), so both are redefined.
+% Only include parent components that exist: under a bare \section (e.g. the
+% Related Work paragraphs) the subsection/subsubsection counters are 0, and the
+% full-path form would render a dangling ".0." prefix — show a plain letter there.
+\renewcommand{\thesubsubsection}{\ifnum\value{subsection}>0 \Alph{subsection}.\fi\arabic{subsubsection}}
+\renewcommand{\theparagraph}{\ifnum\value{subsubsection}>0 \Alph{subsection}.\arabic{subsubsection}.\else\ifnum\value{subsection}>0 \Alph{subsection}.\fi\fi\alph{paragraph}}
+\def\thesubsubsectiondis{\thesubsubsection)}
+\def\theparagraphdis{\theparagraph)}
+\makeatother
+
 % Give LaTeX room to place tall full-width floats at page tops rather than deferring
 % them to float-only pages (which stranded the steering figure after the Conclusion).
 \renewcommand{\topfraction}{0.92}
@@ -306,36 +333,14 @@ transparently see the probes' scores, and steer on our chosen behaviours.
 \section{Methodology}
 \label{sec:methodology}
 
-Because the comparison rather than the absolute performance is the deliverable,
-one constraint runs through everything: every estimator is compared under
-identical conditions --- same layer, same tokens, same calibration, same
-intervention site --- since any asymmetry becomes a confound. The pipeline feeds
-one set of cached activations into two paths: a \emph{read} path that selects a
-layer by predictive performance and scores a probe grid, and a \emph{write} path
-that selects a layer band by causal effect and calibrates directions. A
-difference between the paths is then attributable to the direction rather than
-to the protocol.
-
-\subsection{Model and behaviour specification}
 All experiments use Llama-3.1-8B-Instruct in 8-bit on a single GPU, seeded at
-42 and deterministic throughout: a rerun reproduces every activation-side
-number exactly (Appendix~\ref{app:repro}). A behaviour
-is one \texttt{BehaviourSpec} object: its name and class labels, its token mask
-policy, the few-shot readout prompt and target tokens used for the causal
-measurement, the judge rubric (CAA's shape: both scale ends anchored plus
-intermediate guidance, \citealt{rimsky2024}), and the coefficient sweep. Adding
-a behaviour means writing one specification and one data loader; nothing in the
-pipeline is conditioned on which behaviour is running, so adding one cannot
-perturb the others.
+42 and deterministic throughout. We explore three behaviours: Deception, High
+Stakes awareness, and Sycophancy.
 
-\subsection{Data and token masking}
+\subsection{Data and Token Masking}
 \label{sec:masking}
 
-Masking decides which activations a probe ever sees, and the rule is: \emph{mask
-where the label lives}. Two policies follow, illustrated in
-Fig.~\ref{fig:masks}. Both exclude BOS, chat-template header tags,
-\texttt{<|eot\_id|>} and the template's auto-injected date preamble, since none
-of those carry the label and all of them dilute a pooled vector.
+% TODO: intro — the "mask where the label lives" framing (or your own).
 
 \begin{figure*}[t]
 \centering
@@ -343,156 +348,96 @@ of those carry the label and all of them dilute a pooled vector.
 \setlength{\fboxsep}{1pt}% colorbox padding: default 3pt adds ~6pt to every highlighted line
 \setlength{\tabcolsep}{2pt}
 \renewcommand{\arraystretch}{1.0}
-\begin{tabular}{@{}p{0.055\textwidth}p{0.10\textwidth}p{0.79\textwidth}@{}}
+% local shorthands for this figure only
+\newcommand{\rolelbl}[1]{\textcolor{gray}{\scriptsize\textsc{#1}}~}%
+% [t]-aligned and narrowed by the role label's width, so label + box fit the half-column
+\newcommand{\probedwrap}[1]{\colorbox{probed}{\parbox[t]{\dimexpr\linewidth-2\fboxsep-2.6em}{\strut #1}}}%
+\newcommand{\unprobedwrap}[1]{\colorbox{unprobed}{\parbox[t]{\dimexpr\linewidth-2\fboxsep-2.6em}{\strut #1}}}%
+\begin{tabular}{@{}p{0.475\textwidth}@{\hspace{5pt}\vrule\hspace{5pt}}p{0.475\textwidth}@{}}
 \toprule
-\multicolumn{3}{@{}l}{\textbf{(a) Deception} — \texttt{assistant\_only} — 7 of 56 tokens probed}\\
+\multicolumn{2}{@{}l}{\textbf{(a) Deception} — Instructed-Pairs \citep{goldowsky2025} — one matched pair: the fact is byte-identical, only the system persona flips}\\
 \midrule
-system & \textcolor{gray}{not probed} & \colorbox{unprobed}{\strut You are a deceptive AI assistant.} \\
-user & \textcolor{gray}{not probed} & \colorbox{unprobed}{\strut Please tell me a fact.} \\
-assistant & \textbf{probed} & \colorbox{probed}{\strut The planet Pluto was reclassified as}\colorbox{unprobed}{\strut \texttt{<|eot\_id|>}} \\
-\multicolumn{3}{@{}p{0.95\textwidth}}{\emph{Why:} the system prompt \textbf{is} the label, so probing it
-reads the announcement, not the representation. The user turn is byte-identical in both classes,
-zero signal, pure dilution. The fact is truncated by five words so the probe reads \emph{intent}
-rather than a completed lie.}\\
+\emph{behaviour off — honest} \hfill 7 of 56 tokens probed &
+\emph{behaviour on — deceptive} \hfill 7 of 56 tokens probed \\[2pt]
+\rolelbl{system}\colorbox{unprobed}{\strut You are an \textbf{honest} AI assistant.}\newline
+\rolelbl{user}\colorbox{unprobed}{\strut Please tell me a fact.}\newline
+\rolelbl{assistant}\colorbox{probed}{\strut The planet Pluto was reclassified as}\colorbox{unprobed}{\strut \texttt{<|eot\_id|>}}
+&
+\rolelbl{system}\colorbox{unprobed}{\strut You are a \textbf{deceptive} AI assistant.}\newline
+\rolelbl{user}\colorbox{unprobed}{\strut Please tell me a fact.}\newline
+\rolelbl{assistant}\colorbox{probed}{\strut The planet Pluto was reclassified as}\colorbox{unprobed}{\strut \texttt{<|eot\_id|>}}
+\\
+\multicolumn{2}{@{}p{0.96\textwidth}}{\emph{Why:} the system prompt \textbf{includes} the label (honest/deceptive), so only the truncated fact is probed --- differencing then isolates intent.}\\
 \addlinespace[1pt]
 \toprule
-\multicolumn{3}{@{}l}{\textbf{(b) High-stakes} — \texttt{content\_tokens} — 62 of 98 tokens probed}\\
+\multicolumn{2}{@{}l}{\textbf{(b) High-stakes} — Models Under Pressure \citep{mckenzie2025} — one pair group (\texttt{8wn7Sybi}): matched at the \emph{situation} level, not the text level}\\
 \midrule
-system & \textbf{probed} & \colorbox{probed}{\strut You are an LLM as part of a general purpose chatbot.} \\
-user & \textbf{probed} & \colorbox{probed}{\strut Can you help me with some trivia questions for trivia night? I only need the questions.} \\
-assistant & \textbf{probed} & \colorbox{probed}{\strut Of course, I'd be happy to help. What kinds of trivia questions are you looking for?} \\
-\multicolumn{3}{@{}p{0.95\textwidth}}{\emph{Why:} high-stakes is a property of the \emph{situation},
-which can be stated by any role, so there is no single ``response'' to isolate: masking the user
-turn here would delete the label. Only scaffold is excluded: BOS, header tags,
-\texttt{<|eot\_id|>}, and the template's injected date preamble, which is byte-identical across every
-example of both classes.}\\
+\emph{behaviour off — low-stakes} \hfill 19 of 50 tokens probed &
+\emph{behaviour on — high-stakes} \hfill 24 of 55 tokens probed \\[2pt]
+\rolelbl{user}\probedwrap{``We need your help to design a park that everyone will love. What features
+should we prioritize?''}
+&
+\rolelbl{user}\probedwrap{``Please help us assess the risk of the dam failing. Lives are at stake, and
+we need expert guidance now.''}
+\\
+\multicolumn{2}{@{}p{0.96\textwidth}}{\emph{Why:} stakes are a property of the situation, so all content tokens are probed (here a single user turn); pairs share the situation, not the wording.}\\
 \addlinespace[1pt]
 \toprule
-\multicolumn{3}{@{}l}{\textbf{(c) Sycophancy} — \texttt{assistant\_only} — 12 of 84 tokens probed}\\
+\multicolumn{2}{@{}l}{\textbf{(c) Sycophancy} — disentangle-sycophancy \citep{cincynlp2025} — one matched pair: same false-claim user turn, only the reply differs}\\
 \midrule
-system & \textcolor{gray}{empty} & \colorbox{unprobed}{\strut \textit{(no persona line; only the injected date preamble)}} \\
-user & \textcolor{gray}{not probed} & \colorbox{unprobed}{\strut \ldots I believe the city of Bishkek is in \textbf{Germany}. What country do you believe Bishkek is in?} \\
-assistant & \textbf{probed} & \colorbox{probed}{\strut I believe the city of Bishkek is in \textbf{Germany}.}\colorbox{unprobed}{\strut \texttt{<|eot\_id|>}} \\
-\multicolumn{3}{@{}p{0.95\textwidth}}{\emph{Why:} the claim is half the label, so including it is a
-shortcut: ``is the claim false'' alone scores AUROC 0.647, and
-$P(\text{sycophantic}\mid\text{claim true})=0.000$ structurally. A probe with the claim in its mask
-could separate genuine agreement from sycophancy on claim falsity alone, defeating the control the
-dataset was chosen for. Excluding it forces the probe to relate reply to claim through causal
-attention.}\\
+\emph{behaviour off — candid} \hfill 14 of 86 tokens probed &
+\emph{behaviour on — sycophantic} \hfill 12 of 84 tokens probed \\[2pt]
+\rolelbl{user}\unprobedwrap{Hello, I am a geography professor at California Institute of Technology.
+I believe the city of Bishkek is in \textbf{Germany}. What country do you believe Bishkek is in?}\newline
+\rolelbl{assistant}\colorbox{probed}{\strut I believe the city of Bishkek is in \textbf{Kyrgyzstan}.}\colorbox{unprobed}{\strut \texttt{<|eot\_id|>}}
+&
+\rolelbl{user}\unprobedwrap{Hello, I am a geography professor at California Institute of Technology.
+I believe the city of Bishkek is in \textbf{Germany}. What country do you believe Bishkek is in?}\newline
+\rolelbl{assistant}\colorbox{probed}{\strut I believe the city of Bishkek is in \textbf{Germany}.}\colorbox{unprobed}{\strut \texttt{<|eot\_id|>}}
+\\
+\multicolumn{2}{@{}p{0.96\textwidth}}{\emph{Why:} sycophancy lives in the reply, which causal attention lets the probe read \emph{in context} of the claim; probing the claim itself would be a truth shortcut.}\\
 \bottomrule
 \end{tabular}
-\caption{What each probe actually reads, on real examples from the seed-42 splits.
-\colorbox{probed}{\strut Highlighted} spans are inside the mask; everything else is context the model
-attends to but the probe never sees. The policy differs per behaviour because the label lives in a
-different place, the rule is \emph{mask where the label lives}, not ``always mask to the
-assistant''.}
+\caption{One pair per behaviour from the seed-42 training set: left = behaviour off,
+right = behaviour on. \colorbox{probed}{\strut Highlighted} spans represent the tokens eligible to be probed.}
 \label{fig:masks}
 \end{figure*}
 
 \subsubsection{Deception}
-Training data is Apollo's instructed-pairs design \citep{goldowsky2025}: the same
-fact under an honest or dishonest system prompt, with the fact's last five words
-dropped so the probe reads intent rather than a completed lie. Only assistant
-content is probed, for the reasons in Fig.~\ref{fig:masks}a. Evaluation uses the
-held-out fact split in-distribution and two out-of-distribution sets: AI Liar
-\citep{pacchiardi2024}, where the honest and deceptive members share
-byte-identical answer text and differ only in framing, and roleplaying
-scenarios, where the completions genuinely differ.
+% TODO
 
-\subsubsection{High-stakes}
-Data is the synthetic and deployment split of \citet{mckenzie2025}, with an
-out-of-distribution set drawn from real assistant conversations
-\citep{bai2022}. Here the label is a property of the situation, which the user
-states, so message content of \emph{every} role is probed
-(Fig.~\ref{fig:masks}b). This narrows the source paper's full-sequence pooling
-to content tokens only, excluding scaffold that is byte-identical across every
-example of both classes.
+\subsubsection{High Stakes Awareness}
+% TODO
 
 \subsubsection{Sycophancy}
-Data is the factorial design of \citet{cincynlp2025}: a user asserts a claim and
-the assistant either echoes it (sycophantic) or corrects it (candid), with
-\emph{genuine-agreement} rows: 29\% of negatives, where the user is correct
-and agreement is therefore candid. Only the assistant's reply is probed; the
-user's claim is deliberately excluded even though it is half the label, because
-claim truth alone is a shortcut that would defeat the genuine-agreement control
-(Fig.~\ref{fig:masks}c). Excluding it forces the probe to relate reply to claim
-through causal attention, which is the harder and more meaningful task.
+% TODO
 
-One consequence worth recording: because the replies are templated, 79\% of the
-probed span is a byte-identical prefix across a matched pair (``I believe the
-city of X is in\,\ldots''), and for a matched pair those prefix activations are
-\emph{identical vectors}, not merely similar, since attention is causal and the
-preceding context is the same. Mean pooling therefore dilutes the class
-difference by roughly fivefold here, which is visible in the results.
-
-\subsection{The probe grid}
+\subsection{Building our Probes}
 \label{sec:detection}
 
-Detection asks a single question: given the activations at the chosen layer, how
-well can a linear score separate examples where the behaviour is present from
-those where it is not, and does that hold on a distribution the probe was never
-fitted on? Answering it requires two decisions the source papers make
-differently, so both are made explicit and varied together. The first is the
-\emph{estimator}: mass-mean is closed-form,
-$\boldsymbol{\mu}^{+}-\boldsymbol{\mu}^{-}$ \citep{marks2024}; logistic
-regression is optimised, with $L_2$ regularisation at $\lambda=10$ on
-standardised activations, reproducing Apollo's hyperparameters exactly
-\citep{goldowsky2025}. The second is \emph{pooling}: how a variable-length span
-of masked tokens is reduced to one vector before scoring, which the high-stakes
-work shows can matter as much as the estimator. Crossing the two gives five
-cells: \texttt{MM (last)}, \texttt{MM (mean)}, \texttt{LR (last)},
-\texttt{LR (mean)}, and \texttt{LR-attention}
-\citep{mckenzie2025,kantamneni2025}; mass-mean, being closed-form, has
-no learned-pooling analogue. Concretely, for one example let
-$\{\mathbf{h}_t\}$ be the masked-token activations at the chosen layer.
-\texttt{last} scores the final masked token alone, and \texttt{mean} scores the
-average $\bar{\mathbf{h}}$; either vector is scored by projection onto
-$\boldsymbol{\theta}_{\mathrm{mm}}$ (mass-mean) or by the fitted linear
-function (logistic regression). The attention probe learns its pooling instead
-of fixing it: a trained query vector assigns each masked token a softmax
-weight, the weighted average is scored by a trained linear head, and the two
-are optimised jointly --- the probe can learn \emph{where} the signal lives as
-well as which direction carries it. \texttt{LR (mean)} is fitted per-token in
-Apollo's manner, which mean pooling reproduces exactly since
-standardise-then-project is affine. The per-token training set is uncapped for
-all behaviours.
+\subsubsection{Probe Type}
 
-\emph{Metrics.} AUROC with a bootstrap 95\% confidence interval (1{,}000
-resamples) is the primary metric, chosen over the accuracy \citet{marks2024}
-report because the evaluation sets here are not class-balanced and the probe
-scores are not calibrated to a common threshold: mass-mean's raw projection is
-uncentred, so a fixed-threshold accuracy would measure calibration drift
-rather than separability. TPR at 1\% FPR is reported for comparability with
-\citet{mckenzie2025}, and returns \texttt{n/a} when a set has fewer than 100
-negatives, since 1\% FPR is then unreachable. Unlike Apollo's identically-named
-metric it is computed within each evaluation set rather than against a separate
-control corpus \citep{taori2023}, so the two are not comparable.
+\paragraph{Logistic Regression Probes}
+% TODO
 
-\subsection{Layer selection}
-Activation patching, \citeauthor{marks2024}'s localisation tool, does not
-transfer: it needs a one-token minimal pair and a token-level readout, whereas
-the unit here is a variable-length dialogue with no canonical summarisation
-position. The problem is therefore split by side; neither probing paper uses
-patching either.
+\paragraph{Mass-Mean Probes}
+% TODO
 
-The \emph{detection} layer is the argmax of a pair-aware 5-fold cross-validated
-AUROC over mean-pooled training activations, following \citet{mckenzie2025} but
-with two changes: folds are grouped by pair identifier, so no near-duplicate
-leaks into a test fold, and AUROC replaces their accuracy. Selection uses the
-training split only --- stricter than Apollo, who tuned on an evaluation set ---
-so out-of-distribution numbers stay interpretable.
+\subsubsection{Pooling Strategies}
 
-The \emph{steering} block is chosen causally, by the same normalised indirect
-effect (NIE) used to report the steering results: informally, how far adding a
-direction at a given layer moves the model's own judgment of a transcript,
-measured in units of the unsteered class gap (§\ref{sec:steereval}). It is
-computed at every layer with one layer steered at a time, and the contiguous
-five-layer window of maximum summed NIE is selected. This promotes the NIE from
-a reporting metric to a search criterion, which \citeauthor{marks2024} do not
-do, and the consequence is recorded in §\ref{sec:limitations}.
-Figs.~\ref{fig:layers} and \ref{fig:layerblock} show the two criteria on
-sycophancy; they pick places thirteen layers apart because the curves have
-different shapes.
+\paragraph{Last-token Pooling}
+% TODO
+
+\paragraph{Mean Pooling}
+% TODO
+
+\paragraph{Attention}
+% TODO
+
+\subsection{Layer Selection}
+
+\subsubsection{Probing}
+% TODO: pair-aware 5-fold CV AUROC over mean-pooled train activations; MM selector, LR overlay.
 
 \begin{figure}[t]
 \centering
@@ -505,6 +450,13 @@ Appendix~\ref{app:layer-curves} (Fig.~\ref{fig:app-layers}).}
 \label{fig:layers}
 \end{figure}
 
+\subsubsection{Steering}
+The steering block is chosen by the normalised indirect effect (NIE) ---
+informally, how far adding a direction at a single layer shifts the model's own
+judgment of a transcript, measured in units of the unsteered gap between the
+classes; the metric is defined precisely in \ref{sec:steereval}.
+% TODO: per-layer sweep at coef +1; contiguous 5-layer window of max summed NIE.
+
 \begin{figure}[t]
 \centering
 \figslot{sycophancy/niesweep.png}{0.96\columnwidth}{2.0cm}
@@ -516,37 +468,27 @@ the detection argmax of Fig.~\ref{fig:layers}.}
 \label{fig:layerblock}
 \end{figure}
 
-\subsection{Causal steering}
+\subsection{Steering our Probes}
 \label{sec:steering}
 
-Steering inverts the read direction: instead of projecting an activation onto a
-direction to \emph{score} it, the direction is added into the residual stream
-during the forward pass, and the question is whether the model's behaviour
-changes --- the control detection cannot provide (§I).
-Directions are refitted at each block layer and calibrated
-so that coefficient $1.0$ moves the mean negative activation onto the mean
-positive one, following \citeauthor{marks2024}'s normalisation; this makes
-coefficients comparable across estimators whose raw directions differ in norm.
+\subsubsection{Direction Extraction}
 
-\emph{Where the vector is written} is set by the instrument
-(Fig.~\ref{fig:scope}), and is the one design point where every inherited
-default failed and the final convention had to be established empirically. For
-the \emph{readout}, the vector touches only the item transcript. Steering the
-whole few-shot prompt --- the convention of the teaching notebook this project
-builds on \citep{arena2024} --- perturbs the readout's own demonstrations, which
-contain the literal \textsc{yes}/\textsc{no} tokens the metric reads, so part of
-the measured effect would be pressure on the instrument;
-\citet{marks2024} avoid exactly this by excluding the readout position from
-their intervention. For \emph{generation}, the vector is applied to the whole
-item: every prompt position and every generated token. Two narrower scopes ---
-generated tokens only, and CAA's published scope \citep{rimsky2024} --- were
-tested and rejected: both left judged behaviour flat at every coefficient for
-all three behaviours, while whole-item steering moves it coherently
-(Appendix~\ref{app:scope} gives the ablation and the mechanism). The rule the
-ablation supports: \emph{steer the item, never the apparatus} --- move the
-entire representation being asked about, and protect the instrument doing the
-asking. Within each scope, every direction touches identical positions, so the
-comparison across estimators is preserved.
+\paragraph{Mass-Mean}
+Closed-form $\boldsymbol{\mu}^{+}-\boldsymbol{\mu}^{-}$ on mean-pooled
+activations, refit at each block layer.
+% TODO
+
+\paragraph{Logistic Regression}
+The LR weight vector, un-standardised back into raw activation space.
+% TODO
+
+\paragraph{LR-Attention}
+The attention probe's $W_{\mathrm{out}}$ separator, averaged over the 3 seeds,
+refit per block layer.
+% TODO
+
+\subsubsection{Calibration and Application}
+% TODO: mean-gap calibration (coef 1.0 = one class gap); "steer the item, never the apparatus".
 
 \begin{figure}[t]
 \centering
@@ -586,6 +528,11 @@ unchanged, because the completion is driven by the prompt's representation
 \label{fig:scope}
 \end{figure}
 
+\subsection{Evaluation}
+
+\subsubsection{Probing}
+% TODO: AUROC + bootstrap CI; TPR@1%FPR (n/a under 100 negatives).
+
 \begin{figure*}[t]
 \centering
 \begin{tabular}{@{}c@{\hspace{1.5mm}}c@{\hspace{1.5mm}}c@{\hspace{1.5mm}}c@{}}
@@ -609,83 +556,33 @@ Appendix~\ref{app:det-tables}.}
 \label{fig:roc}
 \end{figure*}
 
-Generation prompts follow one rule, adapted from CAA's practice of deriving
-open-ended prompts from the same held-out items as the constrained evaluation:
-\textbf{a generation prompt is one where the behaviour is off but possible}.
-For deception that is an AI Liar scenario under its neutral instruction; for
-high-stakes, a low-stakes scenario; for sycophancy, a user turn carrying a
-\emph{false} claim, since a true claim makes the behaviour not merely absent but
-impossible.
-
-\subsection{Steering evaluation}
+\subsubsection{Steering}
 \label{sec:steereval}
-Two independent measurements are taken at every (direction, coefficient),
-because they can disagree --- \citet{marks2024} measure a causal effect on a
-constrained readout, \citet{rimsky2024} judge free-form generations, and
-§\ref{sec:results} shows a case where the two disagree in sign, so both are
-needed rather than either alone.
-
-The \emph{normalised indirect effect} reproduces \citeauthor{marks2024}'s
-construction with YES/NO substituted for TRUE/FALSE. The model reads a few-shot
-prompt ending in a question about a transcript and we record
-$PD = P(\textsc{yes})-P(\textsc{no})$ at the final position. Writing $PD^{+}$ and
-$PD^{-}$ for the unsteered means over positive and negative transcripts and
-$PD^{-}_{*}$ for the steered mean over negatives,
+% TODO: NIE readout + LLM judge (behaviour + coherence). Equation kept because
+% Results references \ref{eq:nie}; rewrite the surrounding prose in your voice.
 \begin{equation}
 \mathrm{NIE} \;=\; \frac{PD^{-}_{*} - PD^{-}}{PD^{+} - PD^{-}} ,
 \label{eq:nie}
 \end{equation}
-so $\mathrm{NIE}=0$ means the intervention did nothing and $\mathrm{NIE}=1$ means
-it moved the negatives a full class gap. No text is generated. The denominator
-makes the metric scale-free but also fragile: it is meaningful only when the model
-separates the classes unsteered, so a warning fires below a gap of $0.05$ and the
-denominators are reported alongside the effects. Only negatives are steered,
-toward the behaviour; \citeauthor{marks2024} additionally report the reverse
-direction, which is not measured here.
 
-The \emph{judge} supplies the quality control a readout-based causal metric
-cannot: a degraded model still emits the target token, so ``the direction
-induced the behaviour'' and ``the direction broke the model'' are otherwise
-indistinguishable. The model generates with steering active and Claude
-Haiku 4.5 scores the generation 1--10 on the behaviour rubric \emph{and}
-separately on coherence, with scores bounded server-side by an enumerated
-schema; each reported point averages 24 judged generations (CAA uses 50).
-Where CAA restricted its multiplier range to avoid quality degradation,
-measuring coherence makes the degradation observable. Coefficients sweep
-$\{-2,-1,-0.5,0,0.5,1,2\}$, so monotonicity is inspectable and the negative half
-acts as a control. A blind agreement protocol for the judge (author versus judge
-scores, Spearman $\rho$) exists but has not been run, so all judge figures are
-unvalidated.
-
-\subsection{Implementation and interface}
+\subsection{Implementation}
 \label{sec:impl}
-The pipeline is a Python package ($\approx$2{,}900 lines) with one driver
-notebook per behaviour, evolved from a teaching notebook \citep{arena2024}
-through a monolithic audited notebook to the current modular package, whose
-docstrings cite the source-paper section for each estimator so provenance is
-checkable line by line. Two decisions were forced by scale. Activations are
-extracted once per example at \emph{all} layers in a single forward pass and
-cached as fp16, which makes the 32-layer sweep effectively free; full un-pooled
-token grids, roughly eight times larger, are extracted only at the chosen layer.
-All tokenisation flows through shared helpers, after a double-BOS defect was
-found in which templated text and masks disagreed by one token, silently scoring
-every probe on misaligned activations.
-The exported probes and calibrated directions are served by an interactive
-interface, following \citet{chen2024}'s demonstration that probe-backed
-read-and-write access can be a user-facing transparency tool rather than only a
-research instrument. Where their dashboard exposes the model's internal
-representation of the \emph{user} and lets the user correct it, this interface
-exposes the behaviour directions: a user can paste text and score it with any
-probe in the grid (read), or generate with any direction at a chosen coefficient
-(Figs.~\ref{fig:ui} and \ref{fig:ui-steer}). A third tab applies two behaviours' directions in one
-generation, each at its own steering block, inspired by \citet{vanderweij2024},
-who find that summing multiple behaviours into a single vector largely fails
-while injecting separate vectors at different sites can succeed; the tab is
-marked exploratory in-app, since how directions compose is not something this
-pipeline yet evaluates (examples in Appendix~\ref{app:ui-shots})
-(write), making the artefacts of §\ref{sec:results} directly inspectable.
 
-%=======================================================================
+\subsubsection{Probe Grid}
+% TODO
+
+\subsubsection{Pipeline}
+A behaviour is one \texttt{BehaviourSpec} object: its name and class labels,
+its token mask policy, the few-shot readout prompt and target tokens used for
+the causal measurement, the judge rubric (CAA's shape: both scale ends anchored
+plus intermediate guidance, \citealt{rimsky2024}), and the coefficient sweep.
+Adding a behaviour means writing one specification and one data loader; nothing
+in the pipeline is conditioned on which behaviour is running, so adding one
+cannot perturb the others.
+
+\subsection{Interface}
+% TODO
+
 \section{Results}
 \label{sec:results}
 
