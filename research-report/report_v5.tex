@@ -72,6 +72,15 @@
 \def\theparagraphdis{\theparagraph)}
 \makeatother
 
+% First paragraph after ANY heading starts flush left (subsequent paragraphs
+% keep their indent). IEEEtran signals "indent after heading" via \@afterindent;
+% forcing both setters to false restores the standard-LaTeX convention.
+\makeatletter
+\def\@afterindentfalse{\let\if@afterindent\iffalse}
+\def\@afterindenttrue{\let\if@afterindent\iffalse}
+\makeatother
+
+
 % Give LaTeX room to place tall full-width floats at page tops rather than deferring
 % them to float-only pages (which stranded the steering figure after the Conclusion).
 \renewcommand{\topfraction}{0.92}
