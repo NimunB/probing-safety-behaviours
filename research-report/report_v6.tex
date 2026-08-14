@@ -613,15 +613,20 @@ probe is steered (§\ref{sec:steering}), the injected direction is the head's
 weight vector, averaged over the three seeds.
 
 \subsubsection{Probing Evaluation}
-AUROC with a bootstrap 95\% confidence interval is the primary metric; both
-source papers lead with it, and it is threshold-free --- fixed-threshold
-accuracy was dropped because it measures threshold transfer rather than
-separability (mass-mean's raw projection is uncentred). TPR at 1\% FPR is
-reported for comparability with \citet{mckenzie2025}, computed within each
-evaluation set rather than against a separate control corpus as Apollo do
-\citep{taori2023}, and returned as \texttt{n/a} where a set has fewer than 100
-negatives, since 1\% FPR is then unreachable. ROC curves for the
-out-of-distribution sets are shown in Fig.~\ref{fig:roc}.
+We choose AUROC (area under the receiver operating characteristic curve) with a
+bootstrap 95\% confidence interval as our primary evaluation metric for
+probing. AUROC is the probability that the probe gives a randomly chosen
+behaviour-on example a higher score than a randomly chosen behaviour-off one,
+so it measures only the ordering of scores, never their absolute values. As
+\citet{mckenzie2025} argue, the ranking is what matters in a monitoring
+context. Both Apollo and \citeauthor{mckenzie2025} lead with AUROC for their
+probes. Accuracy, by contrast, requires a threshold fixed on training data
+(what probe score constitutes on-behaviour), and no threshold is comparable
+across estimators, since logistic regression is centred at zero by construction
+while mass-mean's raw projection is not. Fig.~\ref{fig:roc} shows the
+out-of-distribution ROC curves, since out-of-distribution transfer is our
+primary concern \citep{marks2024}. We also report TPR at 1\% FPR for
+comparability with \citet{mckenzie2025} where possible.
 
 \begin{figure*}[t]
 \centering
@@ -633,16 +638,9 @@ out-of-distribution sets are shown in Fig.~\ref{fig:roc}.
 {\footnotesize (a) deception: AI Liar} & {\footnotesize (b) deception: roleplaying} &
 {\footnotesize (c) high-stakes: Anthropic-HH} & {\footnotesize (d) sycophancy: math} \\
 \end{tabular}
-\caption{Out-of-distribution ROC curves, all five probe cells per behaviour. Shown
-out-of-distribution because the in-distribution curves are near-degenerate: four of five deception
-cells reach 0.996 AUROC or more, so the curve hugs the corner and carries nothing the scalar does not.
-Here the cells separate visibly. Panel (a) shows AI Liar, the set with byte-identical answers, where
-MM (mean) leads (0.992) in a near-tie at ceiling; (b) shows roleplaying, the collapse set deception's
-read-side verdict rests on, where LR (mean) leads at 0.706 and LR (last) falls to near-chance
-(0.554). In (c) the logistic-regression family leads (LR mean 0.774); in (d) mass-mean-last leads
-(0.879) and \texttt{last} beats \texttt{mean} \emph{within both families} --- the templated-prefix
-dilution of §\ref{sec:masking} measured out-of-distribution. Full grids in
-Appendix~\ref{app:det-tables}.}
+\caption{Out-of-distribution ROC curves for deception, high stakes, and
+sycophancy. Full grids in Appendix~\ref{app:det-tables}; the in-distribution
+curves are in Appendix~\ref{app:roc-id}.}
 \label{fig:roc}
 \end{figure*}
 
@@ -1458,6 +1456,29 @@ top-down approach to AI transparency', \textit{arXiv preprint} arXiv:2310.01405.
 \appendices
 
 \input{appendix_tables}
+
+\section{In-Distribution ROC Curves}\label{app:roc-id}
+Fig.~\ref{fig:roc-id} is the in-distribution counterpart of Fig.~\ref{fig:roc},
+on each behaviour's held-out test split. It is the evidence for the claim in
+§III-B.3 that these curves are near-degenerate, and therefore that the
+out-of-distribution curves are the informative ones.
+
+\begin{figure*}[t]
+\centering
+\begin{tabular}{@{}c@{\hspace{2mm}}c@{\hspace{2mm}}c@{}}
+\figslot{deception/roc_id.png}{0.31\textwidth}{2.2cm} &
+\figslot{high_stakes/roc_id.png}{0.31\textwidth}{2.2cm} &
+\figslot{sycophancy/roc_id.png}{0.31\textwidth}{2.2cm} \\[1pt]
+{\footnotesize (a) deception} & {\footnotesize (b) high-stakes} & {\footnotesize (c) sycophancy} \\
+\end{tabular}
+\caption{In-distribution ROC curves, all five probe cells per behaviour, on the held-out test
+split. These are the curves §III-B.3 calls near-degenerate: the deception panel in particular hugs
+the top-left corner, where the area carries nothing the scalar in Appendix~\ref{app:det-tables}
+does not. Near the ceiling the cells are also coincident, so the last-drawn probe covers the
+others and per-probe values must be read from the legend. The out-of-distribution curves, where
+the cells separate, are in Fig.~\ref{fig:roc}.}
+\label{fig:roc-id}
+\end{figure*}
 
 \section{Reproducibility}
 \label{app:repro}
