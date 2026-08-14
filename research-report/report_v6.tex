@@ -585,7 +585,8 @@ out-of-distribution, which is what we prioritise.
 The estimators score a single activation vector, so another design decision is
 how to pool (aggregate) the activations of every token in the detection mask
 into one. Each of the three strategies below is taken or adapted from the
-aggregation schemes benchmarked by \citet{mckenzie2025}.
+aggregation schemes benchmarked by \citet{mckenzie2025}. Hyperparameters for
+every probe are listed in Appendix~\ref{app:hyperparams}.
 
 \paragraph{Last-token Pooling}
 The activation of the sample is taken exclusively from the last token in the
@@ -600,68 +601,53 @@ they differ only in training, where the first gives one training row per example
 and the second one row per token. We reproduce the Apollo way, making per-token
 score heatmaps meaningful.
 
-\paragraph{Attention}
-The attention probe \citep{kantamneni2025,mckenzie2025} learns its pooling
+\paragraph{Attention Pooling}
+The attention probe \citep{mckenzie2025} learns its pooling
 instead of fixing it: a trained query vector scores each token in the detection
 mask, a softmax turns the scores into weights, and a trained linear head
 classifies the weighted average. The pooling is learned jointly with the
 logistic-regression estimator. Following \citeauthor{mckenzie2025}'s protocol it
-is trained with three seeds, ensembling by averaging their scores, while also
-reporting the individual performances to check training stability.
+is trained with AdamW over three seeds, ensembling by averaging their scores,
+while also reporting the individual performances to check training stability.
 
 \subsection{Layer Selection}
+We now have which tokens are eligible to be probed (our detection mask,
+§\ref{sec:methodology}-A), which estimators we use to score a behaviour, and our
+pooling strategies (§\ref{sec:methodology}-B). This section determines which
+layer's hidden states we probe, and, which layers we steer.
 
-\subsubsection{Probing}
-The detection layer is the argmax of pair-aware 5-fold cross-validated AUROC of
-a mass-mean probe on mean-pooled training activations, swept over all 32 layers
-(Fig.~\ref{fig:layers}). Cross-validated probe performance is
-\citeauthor{mckenzie2025}'s selection criterion, with two changes: folds are
-grouped by pair identifier, and AUROC replaces accuracy. Mass-mean is the
-selector because it is closed-form --- the sweep is nearly free on cached
-activations --- with a logistic-regression curve overlaid as a robustness check
-on the assumption that its best layer suits the other probes too. Selection
-uses the training split only, stricter than Apollo, who tuned on an evaluation
-split; the argmax is a suggested default in an editable cell, never silently
-applied.
+\subsubsection{Probing Layer Selection}
+The detection layer is chosen as the layer with the highest pair-aware 5-fold
+cross-validated AUROC of a mass-mean probe on mean-pooled training activations,
+swept over all 32 layers. Mass-mean is the estimator because it is closed form,
+and therefore more efficient to train on cached activations. We overlay a
+logistic-regression curve as an additional robustness check, but MM remains the
+decider. \citet{goldowsky2025} and \citet{mckenzie2025} instead select with
+trained logistic-regression-family probes. We cross-validate AUROC where
+\citeauthor{mckenzie2025} cross-validate accuracy, keeping selection consistent
+with our final evaluation metric --- which is also theirs. Like
+\citeauthor{mckenzie2025}, we select on the training set, so the choice cannot
+bias the evaluation sets.
 
-\begin{figure}[t]
-\centering
-\figslot{sycophancy/layers.png}{0.96\columnwidth}{2.0cm}
-\caption{Detection-layer selection, sycophancy: pair-aware 5-fold CV AUROC
-against layer, mass-mean as selector with a logistic-regression overlay as a
-robustness check. The selector climbs late --- 0.86 to 0.94 between layers 16
-and 18 --- and peaks at 19. Deception and high-stakes are in
-Appendix~\ref{app:layer-curves} (Fig.~\ref{fig:app-layers}).}
-\label{fig:layers}
-\end{figure}
-
-\subsubsection{Steering}
-The steering block is chosen by the normalised indirect effect (NIE) ---
-informally, how far adding a direction at a single layer shifts the model's own
-judgment of a transcript, measured in units of the unsteered gap between the
-classes; the metric is defined precisely in \ref{sec:steereval}. The sweep adds
-that layer's mean-gap-calibrated mass-mean direction at coefficient $+1$, one
-layer at a time, while the readout runs on training-split transcripts ---
-selection stays off the test items the in-distribution evaluation later uses ---
-and the contiguous five-layer window of maximum summed effect becomes the
-steering block (Fig.~\ref{fig:layerblock}). Anchoring the sweep on mass-mean is
-a disclosed mild bias toward it in the later comparison, accepted because one
-shared block keeps the three directions comparable at intervention time. This
-promotes the NIE from a reporting metric to a search criterion, which
-\citeauthor{marks2024} do not do; \citeauthor{marks2024}'s own localisation
-tool, activation patching, needs a one-token minimal pair and a token-level
-readout, and neither exists for variable-length dialogues.
-
-\begin{figure}[t]
-\centering
-\figslot{sycophancy/niesweep.png}{0.96\columnwidth}{2.0cm}
-\caption{Steering-block selection, sycophancy: per-layer NIE with one layer
-steered at a time; the selected block is the contiguous five-layer window of
-maximum summed effect. The causal effect concentrates early --- a band at
-layers 4--13, selected window 6--10, nothing above 16 --- thirteen layers below
-the detection argmax of Fig.~\ref{fig:layers}.}
-\label{fig:layerblock}
-\end{figure}
+\subsubsection{Steering Layer Selection}
+Just as the detection layer is selected by our detection metric, the steering
+block is selected by our steering metric: the normalised indirect effect (NIE)
+--- informally, how far adding a direction at a single layer shifts the model's
+own judgment of a transcript (defined in \ref{sec:steereval}). If the block's
+job is to steer well, it should be chosen by how well steering works. The sweep
+adds each layer's mean-gap-calibrated mass-mean direction at coefficient $+1$,
+one layer at a time, while the readout runs on training-split transcripts, and
+we select the contiguous five-layer window with the highest summed NIE. We
+steer a block rather than a single layer as in detection because the causal
+effect is spread across neighbouring layers rather than concentrated at one
+(Fig.~\ref{fig:layerblock}), and \citeauthor{marks2024} likewise intervene on
+their whole causally implicated group of hidden states, not a single site.
+Anchoring the sweep on mass-mean is a disclosed mild bias toward it in the
+later comparison, accepted because one shared block keeps the three directions
+comparable at intervention time. This promotes the NIE from a reporting metric
+to a search criterion, which \citeauthor{marks2024} do not do; their own
+localisation tool, activation patching, needs a one-token minimal pair and a
+token-level readout, and neither exists for our variable-length dialogues.
 
 \subsection{Steering our Probes}
 \label{sec:steering}
@@ -882,6 +868,28 @@ OOD & Liar 54, RP 742 & HH 2{,}984 & math 1{,}000 \\
 \bottomrule
 \end{tabular}
 \end{table}
+\begin{figure}[t]
+\centering
+\figslot{sycophancy/layers.png}{0.96\columnwidth}{2.0cm}
+\caption{Detection-layer selection, sycophancy: pair-aware 5-fold CV AUROC
+against layer, mass-mean as selector with a logistic-regression overlay as a
+robustness check. The selector climbs late --- 0.86 to 0.94 between layers 16
+and 18 --- and peaks at 19. Deception and high-stakes are in
+Appendix~\ref{app:layer-curves} (Fig.~\ref{fig:app-layers}).}
+\label{fig:layers}
+\end{figure}
+
+\begin{figure}[t]
+\centering
+\figslot{sycophancy/niesweep.png}{0.96\columnwidth}{2.0cm}
+\caption{Steering-block selection, sycophancy: per-layer NIE with one layer
+steered at a time; the selected block is the contiguous five-layer window of
+maximum summed effect. The causal effect concentrates early --- a band at
+layers 4--13, selected window 6--10, nothing above 16 --- thirteen layers below
+the detection argmax of Fig.~\ref{fig:layers}.}
+\label{fig:layerblock}
+\end{figure}
+
 
 Table~\ref{tab:config} gives the configuration. All three causal bands land in
 the lower-middle of the network (layers 6--15) while the detection layers sit at
@@ -1493,6 +1501,45 @@ re-running that script is sufficient to bring them back into agreement with the 
 % \raggedbottom stops \flushbottom stretching short pages into sparse ones.
 \onecolumn
 \raggedbottom
+
+\section{Probe Hyperparameters}\label{app:hyperparams}
+
+\begin{table}[H]
+\centering
+\footnotesize
+\begin{tabular}{@{}ll@{}}
+\toprule
+\multicolumn{2}{@{}l}{\textbf{Attention probe}}\\
+\midrule
+Optimizer & AdamW \\
+Epochs & 200 \\
+Learning rate & $5\times10^{-3}$ (fixed) \\
+Weight decay & $1\times10^{-3}$ \\
+Batching & full-batch gradient, one step per epoch \\
+Early stopping & none \\
+Loss & binary cross-entropy \\
+Seeds & 3 (0, 1, 2); bias fitted \\
+\midrule
+\multicolumn{2}{@{}l}{\textbf{Last/Mean probe}}\\
+\midrule
+Regularisation & $L_2$, $\lambda = 10$ \\
+Intercept & none \\
+Inputs & standardised (zero-mean, unit variance) \\
+Solver & lbfgs, max 1,000 iterations \\
+\bottomrule
+\end{tabular}
+\caption{Hyperparameters per probe. The Last/Mean settings are those of the
+logistic-regression estimator. The attention probe's head is likewise
+logistic-regression-style (sigmoid, binary cross-entropy), but is trained
+jointly with its pooling under the Attention settings above. The two
+logistic-regression cells share identical settings and differ only in training
+rows (one per example vs one per token, §III-B.2). Mass-mean is closed form and
+has no hyperparameters. The attention recipe
+follows the teaching notebook this pipeline evolved from \citep{arena2024}
+rather than \citet{mckenzie2025}, who add a learning-rate schedule and early
+stopping; optimizer, epochs and starting learning rate coincide.}
+\label{tab:hyperparams}
+\end{table}
 
 \section{Detection-Layer Selection Curves}\label{app:layer-curves}
 
