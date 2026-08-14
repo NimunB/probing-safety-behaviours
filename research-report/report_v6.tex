@@ -536,7 +536,7 @@ from a usable pool of 3,000 replies, 1,000 sycophantic and 2,000 candid. The
 set tests whether the probe has learned deference to the user rather than the
 content of any one domain.
 
-\subsection{Building our Probes}
+\subsection{Probing}
 \label{sec:detection}
 
 We define a probe as an estimator crossed with a pooling strategy. Crossing our
@@ -602,13 +602,49 @@ and the second one row per token. We reproduce the Apollo way, making per-token
 score heatmaps meaningful.
 
 \paragraph{Attention Pooling}
-The attention probe \citep{mckenzie2025} learns its pooling
-instead of fixing it: a trained query vector scores each token in the detection
-mask, a softmax turns the scores into weights, and a trained linear head
-classifies the weighted average. The pooling is learned jointly with the
-logistic-regression estimator. Following \citeauthor{mckenzie2025}'s protocol it
-is trained with AdamW over three seeds, ensembling by averaging their scores,
-while also reporting the individual performances to check training stability.
+The attention probe \citep{mckenzie2025} learns its pooling instead of fixing
+it: a trained query vector scores each token in the detection mask, a softmax
+turns the scores into weights, and a trained linear head classifies the
+weighted average. The pooling is learned jointly with the logistic-regression
+estimator. Following \citeauthor{mckenzie2025}'s protocol it is trained with
+AdamW over three seeds, ensembling by averaging their scores, while also
+reporting the individual performances to check training stability. When this
+probe is steered (§\ref{sec:steering}), the injected direction is the head's
+weight vector, averaged over the three seeds.
+
+\subsubsection{Probing Evaluation}
+AUROC with a bootstrap 95\% confidence interval is the primary metric; both
+source papers lead with it, and it is threshold-free --- fixed-threshold
+accuracy was dropped because it measures threshold transfer rather than
+separability (mass-mean's raw projection is uncentred). TPR at 1\% FPR is
+reported for comparability with \citet{mckenzie2025}, computed within each
+evaluation set rather than against a separate control corpus as Apollo do
+\citep{taori2023}, and returned as \texttt{n/a} where a set has fewer than 100
+negatives, since 1\% FPR is then unreachable. ROC curves for the
+out-of-distribution sets are shown in Fig.~\ref{fig:roc}.
+
+\begin{figure*}[t]
+\centering
+\begin{tabular}{@{}c@{\hspace{1.5mm}}c@{\hspace{1.5mm}}c@{\hspace{1.5mm}}c@{}}
+\figslot{deception/roc_ai_liar.png}{0.24\textwidth}{2.3cm} &
+\figslot{deception/roc_roleplaying.png}{0.24\textwidth}{2.3cm} &
+\figslot{high_stakes/roc_ood.png}{0.24\textwidth}{2.3cm} &
+\figslot{sycophancy/roc_ood.png}{0.24\textwidth}{2.3cm} \\[1pt]
+{\footnotesize (a) deception: AI Liar} & {\footnotesize (b) deception: roleplaying} &
+{\footnotesize (c) high-stakes: Anthropic-HH} & {\footnotesize (d) sycophancy: math} \\
+\end{tabular}
+\caption{Out-of-distribution ROC curves, all five probe cells per behaviour. Shown
+out-of-distribution because the in-distribution curves are near-degenerate: four of five deception
+cells reach 0.996 AUROC or more, so the curve hugs the corner and carries nothing the scalar does not.
+Here the cells separate visibly. Panel (a) shows AI Liar, the set with byte-identical answers, where
+MM (mean) leads (0.992) in a near-tie at ceiling; (b) shows roleplaying, the collapse set deception's
+read-side verdict rests on, where LR (mean) leads at 0.706 and LR (last) falls to near-chance
+(0.554). In (c) the logistic-regression family leads (LR mean 0.774); in (d) mass-mean-last leads
+(0.879) and \texttt{last} beats \texttt{mean} \emph{within both families} --- the templated-prefix
+dilution of §\ref{sec:masking} measured out-of-distribution. Full grids in
+Appendix~\ref{app:det-tables}.}
+\label{fig:roc}
+\end{figure*}
 
 \subsection{Layer Selection}
 We now have which tokens are eligible to be probed (our detection mask,
@@ -649,55 +685,69 @@ to a search criterion, which \citeauthor{marks2024} do not do; their own
 localisation tool, activation patching, needs a one-token minimal pair and a
 token-level readout, and neither exists for our variable-length dialogues.
 
-\subsection{Steering our Probes}
+\subsection{Steering}
 \label{sec:steering}
 
-Steering inverts the read direction: instead of projecting activations onto a
-direction to score them, the direction is added into the residual stream during
-the forward pass. Each steered direction has a detection counterpart in the
-grid of §\ref{sec:detection}, so the read/write comparison is fully crossed.
-Directions are refit at every block layer rather than reusing one vector
-across layers as \citet{marks2024} do: the residual basis drifts and norms grow
-with depth, and \citet{vanderweij2024} find injecting separate vectors at
-separate layers promising where a single summed vector is not.
+Probing allows us to find a direction from off- to on-behaviour, and use it to
+score an interaction with the model. Steering involves adding that direction to
+the residual stream of selected layers and tokens during the forward pass
+(inference time). We steer with the same estimators we probed with, to compare
+how each fares at the two tasks (read/write). Of the five probes we steer
+three: \texttt{MM (mean)}, \texttt{LR (mean)}, and \texttt{LR-attention}. The
+last-token variants are left out because steering writes to every token
+position while their direction is measured at a single one, and because
+last-token pooling underperforms mean and attention both in
+\citeauthor{mckenzie2025}'s benchmark and in our own grid. The three directions
+come out of fitting with arbitrary, different lengths, so adding them at the
+same coefficient would push the model by different amounts --- a comparison of
+norms, not estimators. We therefore calibrate each direction so that
+coefficient $+1$ moves the average off-behaviour activation exactly onto the
+average on-behaviour activation \citep{marks2024}. One unit of coefficient then
+means the same dose for every arm, layer, and behaviour, and the dose-response
+curves become directly comparable. For LR, the weight vector is first divided
+back through the scaler's standard deviation so the direction sits in raw
+activation space.
 
-\subsubsection{Direction Extraction}
+At the block chosen in §\ref{sec:methodology}-C.2, each layer receives its own
+direction: MM and LR are refit from that layer's pooled activations, and the
+attention head is retrained at that layer (three seeds, as in
+§\ref{sec:methodology}-B.2). This differs from \citeauthor{marks2024}, who
+reuse a single vector across their intervention layers; per-layer fits keep the
+calibration exact at every steered layer, and \citet{vanderweij2024} find
+separate per-layer vectors promising where a single summed vector is not.
+Where the vector is written is covered with the steering evaluation below
+(§\ref{sec:steereval}).
 
-\paragraph{Mass-Mean}
-Closed-form $\boldsymbol{\mu}^{+}-\boldsymbol{\mu}^{-}$ on mean-pooled
-activations, refit at each block layer --- the direction \citet[Table~2]{marks2024}
-find most causally effective, and the reference arm here.
-
-\paragraph{Logistic Regression}
-The fitted weight vector, un-standardised back into raw activation space so it
-is injected in the same units as mass-mean. One disclosed asymmetry: the grid's
-\texttt{LR (mean)} probe is trained per-token, while the steered vector is fit
-on mean-pooled activations --- same name, slightly different fit; mass-mean is
-identical in both roles.
-
-\paragraph{LR-Attention}
-The attention probe's $W_{\mathrm{out}}$ separator --- the direction it reads
-with --- averaged over the 3 seeds and refit per block layer on that layer's
-full-sequence activations. Under the application convention below the injected
-vector shifts the attention-pooled context by exactly itself, since softmax
-weights are invariant to a uniform shift, so the probe's nonlinearity is
-transparent to steering.
-
-\subsubsection{Calibration and Application}
-Every direction is scaled so that coefficient $1.0$ moves the mean negative
-activation onto the mean positive one, \citeauthor{marks2024}'s normalisation
---- making coefficients comparable across estimators whose raw norms differ.
-Where the vector is written follows one rule, established empirically:
-\emph{steer the item, never the apparatus} (Fig.~\ref{fig:scope}). The
-readout steers only the item transcript --- its few-shot demonstrations contain
-the literal \textsc{yes}/\textsc{no} tokens the metric reads, and
-\citet{marks2024} likewise exclude the readout position from their
-intervention. Generation steers every position, prompt and completion: two
-narrower scopes, completion-only and CAA's published convention
-\citep{rimsky2024}, left judged behaviour flat at every coefficient for all
-three behaviours (ablation in Appendix~\ref{app:scope}). Within a scope every
-direction touches identical positions, so a difference between arms can only
-come from the direction itself.
+\subsubsection{Steering Evaluation}
+\label{sec:steereval}
+Two independent instruments are measured at every (direction, coefficient),
+because they answer different questions and can disagree. The
+\emph{normalised indirect effect} reproduces \citeauthor{marks2024}'s
+construction with \textsc{yes}/\textsc{no} substituted for
+\textsc{true}/\textsc{false}: the model reads a few-shot prompt ending in a
+question about a transcript, and $PD=P(\textsc{yes})-P(\textsc{no})$ is read at
+the final position --- no text is generated. With $PD^{+}$, $PD^{-}$ the
+unsteered class means and $PD^{-}_{*}$ the steered mean over negatives,
+\begin{equation}
+\mathrm{NIE} \;=\; \frac{PD^{-}_{*} - PD^{-}}{PD^{+} - PD^{-}} ,
+\label{eq:nie}
+\end{equation}
+so $0$ means the intervention did nothing and $1$ means it moved the negatives
+a full class gap. The denominator is meaningful only when the readout separates
+the classes unsteered; a warning fires below a gap of $0.05$. The \emph{judge}
+supplies what a readout cannot: a degraded model still emits the target token,
+so induced behaviour and a broken model are otherwise indistinguishable. The
+model generates with steering active and Claude Haiku 4.5 scores each generation
+1--10 on the behaviour rubric and, separately, coherence --- where
+\citet{rimsky2024} restricted their multiplier range to avoid degradation,
+coherence makes it observable. Rubrics follow CAA's anchored shape; each point
+averages 24 judged generations (CAA use 50); coefficients sweep
+$\{-2,\dots,2\}$ so the negative half is a suppression control. Generation
+prompts follow CAA's practice of deriving open-ended prompts from held-out
+items, under one rule: the behaviour is off but possible --- a neutral-instruction
+scenario for deception, a low-stakes scenario, a false-claim user turn for
+sycophancy. The judge's blind validation protocol exists but has not been run;
+judge figures are unvalidated.
 
 \begin{figure}[t]
 \centering
@@ -736,73 +786,6 @@ unchanged, because the completion is driven by the prompt's representation
 (Appendix~\ref{app:scope}).}
 \label{fig:scope}
 \end{figure}
-
-\subsection{Evaluation}
-
-\subsubsection{Probing}
-AUROC with a bootstrap 95\% confidence interval is the primary metric; both
-source papers lead with it, and it is threshold-free --- fixed-threshold
-accuracy was dropped because it measures threshold transfer rather than
-separability (mass-mean's raw projection is uncentred). TPR at 1\% FPR is
-reported for comparability with \citet{mckenzie2025}, computed within each
-evaluation set rather than against a separate control corpus as Apollo do
-\citep{taori2023}, and returned as \texttt{n/a} where a set has fewer than 100
-negatives, since 1\% FPR is then unreachable. ROC curves for the
-out-of-distribution sets are shown in Fig.~\ref{fig:roc}.
-
-\begin{figure*}[t]
-\centering
-\begin{tabular}{@{}c@{\hspace{1.5mm}}c@{\hspace{1.5mm}}c@{\hspace{1.5mm}}c@{}}
-\figslot{deception/roc_ai_liar.png}{0.24\textwidth}{2.3cm} &
-\figslot{deception/roc_roleplaying.png}{0.24\textwidth}{2.3cm} &
-\figslot{high_stakes/roc_ood.png}{0.24\textwidth}{2.3cm} &
-\figslot{sycophancy/roc_ood.png}{0.24\textwidth}{2.3cm} \\[1pt]
-{\footnotesize (a) deception: AI Liar} & {\footnotesize (b) deception: roleplaying} &
-{\footnotesize (c) high-stakes: Anthropic-HH} & {\footnotesize (d) sycophancy: math} \\
-\end{tabular}
-\caption{Out-of-distribution ROC curves, all five probe cells per behaviour. Shown
-out-of-distribution because the in-distribution curves are near-degenerate: four of five deception
-cells reach 0.996 AUROC or more, so the curve hugs the corner and carries nothing the scalar does not.
-Here the cells separate visibly. Panel (a) shows AI Liar, the set with byte-identical answers, where
-MM (mean) leads (0.992) in a near-tie at ceiling; (b) shows roleplaying, the collapse set deception's
-read-side verdict rests on, where LR (mean) leads at 0.706 and LR (last) falls to near-chance
-(0.554). In (c) the logistic-regression family leads (LR mean 0.774); in (d) mass-mean-last leads
-(0.879) and \texttt{last} beats \texttt{mean} \emph{within both families} --- the templated-prefix
-dilution of §\ref{sec:masking} measured out-of-distribution. Full grids in
-Appendix~\ref{app:det-tables}.}
-\label{fig:roc}
-\end{figure*}
-
-\subsubsection{Steering}
-\label{sec:steereval}
-Two independent instruments are measured at every (direction, coefficient),
-because they answer different questions and can disagree. The
-\emph{normalised indirect effect} reproduces \citeauthor{marks2024}'s
-construction with \textsc{yes}/\textsc{no} substituted for
-\textsc{true}/\textsc{false}: the model reads a few-shot prompt ending in a
-question about a transcript, and $PD=P(\textsc{yes})-P(\textsc{no})$ is read at
-the final position --- no text is generated. With $PD^{+}$, $PD^{-}$ the
-unsteered class means and $PD^{-}_{*}$ the steered mean over negatives,
-\begin{equation}
-\mathrm{NIE} \;=\; \frac{PD^{-}_{*} - PD^{-}}{PD^{+} - PD^{-}} ,
-\label{eq:nie}
-\end{equation}
-so $0$ means the intervention did nothing and $1$ means it moved the negatives
-a full class gap. The denominator is meaningful only when the readout separates
-the classes unsteered; a warning fires below a gap of $0.05$. The \emph{judge}
-supplies what a readout cannot: a degraded model still emits the target token,
-so induced behaviour and a broken model are otherwise indistinguishable. The
-model generates with steering active and Claude Haiku 4.5 scores each generation
-1--10 on the behaviour rubric and, separately, coherence --- where
-\citet{rimsky2024} restricted their multiplier range to avoid degradation,
-coherence makes it observable. Rubrics follow CAA's anchored shape; each point
-averages 24 judged generations (CAA use 50); coefficients sweep
-$\{-2,\dots,2\}$ so the negative half is a suppression control. Generation
-prompts follow CAA's practice of deriving open-ended prompts from held-out
-items, under one rule: the behaviour is off but possible --- a neutral-instruction
-scenario for deception, a low-stakes scenario, a false-claim user turn for
-sycophancy. The judge's blind validation protocol exists but has not been run;
-judge figures are unvalidated.
 
 \subsection{Implementation}
 \label{sec:impl}
