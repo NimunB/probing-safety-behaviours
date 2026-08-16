@@ -90,6 +90,11 @@
 \setcounter{topnumber}{3}
 \setcounter{totalnumber}{5}
 \setlength{\intextsep}{6pt plus 2pt minus 2pt}  % tighter gaps around [H] floats
+\setlength{\textfloatsep}{8pt plus 2pt minus 2pt}    % gap between a top float and the text below it
+\setlength{\dbltextfloatsep}{8pt plus 2pt minus 2pt} % same, for full-width (figure*) floats
+\setlength{\floatsep}{6pt plus 2pt minus 2pt}        % gap between two floats stacked in one column
+\setlength{\dblfloatsep}{6pt plus 2pt minus 2pt}     % same, for stacked full-width floats
+\raggedbottom  % let short columns end short instead of stretching gaps mid-column
 
 % Figure slot: renders figures/<file> if present, else a labelled placeholder box.
 % Drop the PNGs listed in figures/README.md into figures/ and they appear automatically.
@@ -631,22 +636,6 @@ out-of-distribution ROC curves, since out-of-distribution transfer is our
 primary concern \citep{marks2024}. We also report TPR at 1\% FPR for
 comparability with \citet{mckenzie2025} where possible.
 
-\begin{figure*}[t]
-\centering
-\begin{tabular}{@{}c@{\hspace{1.5mm}}c@{\hspace{1.5mm}}c@{\hspace{1.5mm}}c@{}}
-\figslot{deception/roc_ai_liar.png}{0.24\textwidth}{2.3cm} &
-\figslot{deception/roc_roleplaying.png}{0.24\textwidth}{2.3cm} &
-\figslot{high_stakes/roc_ood.png}{0.24\textwidth}{2.3cm} &
-\figslot{sycophancy/roc_ood.png}{0.24\textwidth}{2.3cm} \\[1pt]
-{\footnotesize (a) deception: AI Liar} & {\footnotesize (b) deception: roleplaying} &
-{\footnotesize (c) high-stakes: Anthropic-HH} & {\footnotesize (d) sycophancy: math} \\
-\end{tabular}
-\caption{Out-of-distribution ROC curves for deception, high stakes, and
-sycophancy. Full grids in Appendix~\ref{app:det-tables}; the in-distribution
-curves are in Appendix~\ref{app:roc-id}.}
-\label{fig:roc}
-\end{figure*}
-
 \subsection{Layer Selection}
 We now have which tokens are eligible to be probed (our detection mask,
 §\ref{sec:methodology}-A), which estimators we use to score a behaviour, and our
@@ -725,39 +714,7 @@ separate per-layer vectors promising where a single summed vector is not.
 Where the vector is written is covered with the steering evaluation below
 (§\ref{sec:steereval}).
 
-\subsubsection{Steering Evaluation}
-\label{sec:steereval}
-We employ two separate independent instruments, which are measured at every
-(direction, coefficient), because they answer different questions and can
-disagree.
-
-The primary metric is the \textbf{normalised indirect effect} (NIE), which reproduces
-\citeauthor{marks2024}'s causal metric with YES/NO substituted for TRUE/FALSE.
-A constrained next-token readout of this kind is also CAA's primary metric:
-they report the average probability the model assigns to the answer matching
-the behaviour on held-out multiple-choice questions \citep{rimsky2024}.
-The model reads a few-shot prompt, ending in a question about whether a
-behaviour is present in an off-behaviour transcript, and
-$PD = P(\textsc{yes}) - P(\textsc{no})$ is read at the final position (no text
-is generated). We calculate the mean value of this for the off-behaviour
-transcripts ($PD^{-}$), the on-behaviour transcripts ($PD^{+}$), and the
-steered off-behaviour transcripts ($PD^{-}_{*}$). The NIE is then given as:
-\begin{equation}
-\mathrm{NIE} \;=\; \frac{PD^{-}_{*} - PD^{-}}{PD^{+} - PD^{-}} .
-\label{eq:nie}
-\end{equation}
-Here, $0$ means the intervention did nothing and $1$ means it moved the
-negatives a full class gap. The denominator is meaningful only when the readout
-separates the classes unsteered; a warning fires below a gap of $0.05$. Here,
-we strategically only steer the tokens of the transcript under evaluation, and
-not the few-shot demonstrations or the question: the final position answers by
-attending to them, so steering their representations could shift
-$P(\textsc{yes}) - P(\textsc{no})$ directly, without the transcript's
-representation changing (pressure on the instrument rather than an effect of
-the intervention). The prompt used for NIE, and the tokens steered, are
-visualized in Fig.~\ref{fig:scope}.
-
-\begin{figure}[H]
+\begin{figure}[t]
 \centering
 \footnotesize\sffamily
 \setlength{\fboxsep}{3pt}%
@@ -795,6 +752,38 @@ steered, and the answer is read at the
 \label{fig:scope}
 \end{figure}
 
+\subsubsection{Steering Evaluation}
+\label{sec:steereval}
+We employ two separate independent instruments, which are measured at every
+(direction, coefficient), because they answer different questions and can
+disagree.
+
+The primary metric is the \textbf{normalised indirect effect} (NIE), which reproduces
+\citeauthor{marks2024}'s causal metric with YES/NO substituted for TRUE/FALSE.
+A constrained next-token readout of this kind is also CAA's primary metric:
+they report the average probability the model assigns to the answer matching
+the behaviour on held-out multiple-choice questions \citep{rimsky2024}.
+The model reads a few-shot prompt, ending in a question about whether a
+behaviour is present in an off-behaviour transcript, and
+$PD = P(\textsc{yes}) - P(\textsc{no})$ is read at the final position (no text
+is generated). We calculate the mean value of this for the off-behaviour
+transcripts ($PD^{-}$), the on-behaviour transcripts ($PD^{+}$), and the
+steered off-behaviour transcripts ($PD^{-}_{*}$). The NIE is then given as:
+\begin{equation}
+\mathrm{NIE} \;=\; \frac{PD^{-}_{*} - PD^{-}}{PD^{+} - PD^{-}} .
+\label{eq:nie}
+\end{equation}
+Here, $0$ means the intervention did nothing and $1$ means it moved the
+negatives a full class gap. The denominator is meaningful only when the readout
+separates the classes unsteered; a warning fires below a gap of $0.05$. Here,
+we strategically only steer the tokens of the transcript under evaluation, and
+not the few-shot demonstrations or the question: the final position answers by
+attending to them, so steering their representations could shift
+$P(\textsc{yes}) - P(\textsc{no})$ directly, without the transcript's
+representation changing (pressure on the instrument rather than an effect of
+the intervention). The prompt used for NIE, and the tokens steered, are
+visualized in Fig.~\ref{fig:scope}.
+
 NIE tells us whether a model's perception of a transcript can be steered, but
 open-ended generation tells us whether that becomes elicited behaviour. To
 evaluate this, we strip the assistant response from a held-out item and let the
@@ -804,7 +793,7 @@ to the last user turn so the model continues a real dialogue. We steer every
 token of that prompt and every token it generates, across the steering block of
 layers selected in §\ref{sec:methodology}-C.2 (Fig.~\ref{fig:scope-gen}).
 
-\begin{figure}[H]
+\begin{figure}[t]
 \centering
 \footnotesize\sffamily
 \setlength{\fboxsep}{3pt}%
@@ -843,6 +832,7 @@ Each (direction, coefficient) averages 24 generations (CAA use 50), drawn from o
 
 \subsection{Interface}
 \label{sec:impl}
+
 Each behaviour exports a $\sim$0.5\,MB bundle: the five fitted probes at its
 detection layer (\texttt{MM (last)}, \texttt{MM (mean)}, \texttt{LR (last)},
 \texttt{LR (mean)}, \texttt{LR-attention}), the calibrated directions
@@ -896,6 +886,23 @@ Appendix~\ref{app:layer-curves}.}
 steered at a time, the selected five-layer block highlighted.}
 \label{fig:layerblock}
 \end{figure}
+
+\begin{figure*}[t]
+\centering
+\begin{tabular}{@{}c@{\hspace{1.5mm}}c@{\hspace{1.5mm}}c@{\hspace{1.5mm}}c@{}}
+\figslot{deception/roc_ai_liar.png}{0.24\textwidth}{2.3cm} &
+\figslot{deception/roc_roleplaying.png}{0.24\textwidth}{2.3cm} &
+\figslot{high_stakes/roc_ood.png}{0.24\textwidth}{2.3cm} &
+\figslot{sycophancy/roc_ood.png}{0.24\textwidth}{2.3cm} \\[1pt]
+{\footnotesize (a) deception: AI Liar} & {\footnotesize (b) deception: roleplaying} &
+{\footnotesize (c) high-stakes: Anthropic-HH} & {\footnotesize (d) sycophancy: math} \\
+\end{tabular}
+\caption{Out-of-distribution ROC curves for deception, high stakes, and
+sycophancy. Full grids in Appendix~\ref{app:det-tables}; the in-distribution
+curves are in Appendix~\ref{app:roc-id}.}
+\label{fig:roc}
+\end{figure*}
+
 
 
 Table~\ref{tab:config} gives the configuration. All three causal bands land in
