@@ -880,6 +880,17 @@ throughout. The training-split readout gap serving as the sweep's denominator
 is $+0.058$.
 
 \subsubsection{Detection (Probing)}
+In-distribution detection is near-ceiling: four of the five probes reach
+$\geq 0.996$ AUROC and three reach exactly 1.000
+(Appendix~\ref{app:det-tables}, Table~\ref{tab:app-det-deception}).
+
+The two out-of-distribution sets separate (Fig.~\ref{fig:roc}a--b). Every probe
+scores highly on AI Liar, spanning 0.818--0.992 with \texttt{MM (mean)}
+highest; every probe falls on roleplaying, spanning 0.554--0.706 with
+\texttt{LR (mean)} highest. The ranking is not preserved between them:
+\texttt{MM (mean)} is first on AI Liar and fourth on roleplaying. On the two
+sets pooled, \texttt{LR (mean)} leads at 0.722.
+
 
 \begin{figure*}[t]
 \centering
@@ -928,6 +939,18 @@ through layer 12, and falls to near zero above layer 14, with no negative band. 
 training-split readout gap serving as the sweep's denominator is $+0.177$.
 
 \subsubsection{Detection (Probing)}
+In-distribution scores spread across 0.885--0.996 rather than saturating at the
+ceiling, with \texttt{LR-attention} highest at 0.996 and \texttt{LR (mean)}
+next at 0.993 (Appendix~\ref{app:det-tables},
+Table~\ref{tab:app-det-highstakes}).
+
+On OOD (Anthropic-HH) every probe falls by between 0.20 and 0.28
+(Fig.~\ref{fig:roc}c). \texttt{LR (mean)} leads at 0.774, followed by
+\texttt{LR-attention} at 0.755 and \texttt{MM (mean)} at 0.737; the two
+last-token probes come last at 0.687 and 0.686. The logistic-regression family
+leads both sets, and the ordering is otherwise stable except
+\texttt{LR (last)}, which falls from third in-distribution to last.
+
 
 \subsubsection{Steering}
 
