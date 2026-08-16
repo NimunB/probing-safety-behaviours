@@ -45,6 +45,21 @@
 \usetikzlibrary{positioning,arrows.meta,fit,backgrounds}
 \usepackage[hidelinks]{hyperref}
 
+% IEEEtran sets table captions ABOVE the table, centred, in small caps. Match the
+% FIGURE caption style instead: below the table, normal font and case, "Table N. text".
+\makeatletter
+\renewcommand{\@makecaption}[2]{%
+  \vskip\abovecaptionskip
+  \setbox\@tempboxa\hbox{\normalfont\footnotesize #1.\hskip 1em\relax #2}%
+  \ifdim\wd\@tempboxa>\hsize
+    \normalfont\footnotesize #1.\hskip 1em\relax #2\par
+  \else
+    \hbox to\hsize{\hfil\box\@tempboxa\hfil}%
+  \fi
+  \vskip\belowcaptionskip}
+\makeatother
+\renewcommand{\tablename}{Table}   % 'Table I.' to match 'Fig. 4.', not IEEEtran's 'TABLE I'
+
 \renewcommand{\bibsection}{\section*{References}}
 
 % IEEEtran renders \subsubsection ("1)") and \paragraph ("a)") as RUN-IN headings:
@@ -832,25 +847,6 @@ in-app, since composition is not something this pipeline evaluates.
 \section{Results}
 \label{sec:results}
 
-\begin{table}[t]
-\caption{Selected configuration. Layers are 0-indexed of 32.}
-\label{tab:config}
-\centering
-\small
-\setlength{\tabcolsep}{3.5pt}
-\begin{tabular}{lccc}
-\toprule
-& \textbf{Deception} & \textbf{High-stakes} & \textbf{Sycophancy} \\
-\midrule
-Detection layer & 12 & 20 & 19 \\
-Steering block  & 11--15 & 6--10 & 6--10 \\
-Mask policy & assistant & content & assistant \\
-Train / ID test & 488 / 124 & 3{,}000 / 1{,}000 & 2{,}736 / 694 \\
-OOD & Liar 54, RP 742 & HH 2{,}984 & math 1{,}000 \\
-\bottomrule
-\end{tabular}
-\end{table}
-
 \begin{figure}[t]
 \centering
 \figslot{sycophancy/layers.png}{0.96\columnwidth}{2.0cm}
@@ -956,11 +952,6 @@ serving as the sweep's denominator is $+1.034$.
 \subsection{Synthesis}
 
 \begin{table}[t]
-\caption{The read/write comparison, one row per held-out evaluation set. Best
-detector by AUROC; best steerer by readout NIE at coefficient $+2$, the sweep's
-common endpoint. The dissociation holds where the two columns name different
-families.}
-\label{tab:synth}
 \centering
 \footnotesize
 \setlength{\tabcolsep}{2pt}
@@ -974,6 +965,11 @@ High-stakes -- HH & LR (mean) 0.774 & MM $+1.34$ & holds \\
 Sycophancy -- math & MM (last) 0.879 & \textbf{LR-attn} $+0.77$ & \textbf{inverts} \\
 \bottomrule
 \end{tabular}
+\caption{The read/write comparison, one row per held-out evaluation set. Best
+detector by AUROC; best steerer by readout NIE at coefficient $+2$, the sweep's
+common endpoint. The dissociation holds where the two columns name different
+families.}
+\label{tab:synth}
 \end{table}
 
 \section{Discussion}
@@ -1328,8 +1324,9 @@ the cells separate, are in Fig.~\ref{fig:roc}.}
 
 \section{Reproducibility}
 \label{app:repro}
-Model \texttt{meta-llama/Llama-3.1-8B-Instruct} in 8-bit, seed 42, on one NVIDIA RTX 5090. Selected
-layers and blocks are in Table~\ref{tab:config}. Activations are extracted once per example at all 32
+Model \texttt{meta-llama/Llama-3.1-8B-Instruct} in 8-bit, seed 42, on one NVIDIA RTX 5090. Detection
+layers are 12 (deception), 20 (high-stakes) and 19 (sycophancy); steering blocks are 11--15, 6--10
+and 6--10 respectively. Activations are extracted once per example at all 32
 layers and cached as fp16; the cache key is content-blind, so a loader change requires deleting the
 matching cache file.
 
