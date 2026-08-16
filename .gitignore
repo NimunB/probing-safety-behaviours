@@ -31,6 +31,8 @@ docs-for-nimun/claude-conversations/
 *.blg
 *.toc
 research-report/*.pdf
+# ...except the dissertation itself, which is committed so it is readable on GitHub.
+!research-report/Nimun_Bajwa_PG_Project_Dissertation.pdf
 
 __pycache__/
 *.py[cod]
