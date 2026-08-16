@@ -40,12 +40,11 @@ safety_probes/          the pipeline as an importable package (~2,900 lines)
   evaluation.py           couples steering to the judge
   viz.py, export.py, summary.py
 
-notebooks/              one driver per behaviour, plus a cross-behaviour comparison
+notebooks/              one driver notebook per behaviour
 ui_probe.py             interactive scoring + steering over the exported bundles
 data/                   vendored and pinned inputs
 exported_probes/        frozen probes, directions and result tables from the last run
 research-report/        the thesis report (LaTeX), its figures, and a table generator
-docs-for-nimun/         the decision record, data reference, and the source papers
 ```
 
 Adding a behaviour means writing one `BehaviourSpec` and one loader. Nothing downstream is
@@ -127,7 +126,7 @@ python -c "from safety_probes import runtime; runtime.load_env(); print('ok')"
 `sycophancy.ipynb` top to bottom; each loads the model once and ends by exporting its bundle. Two
 cells per notebook are marked `EDIT HERE`: the detection layer and the steering block both default to
 `argmax` / `pick_block`, and pinning them to the recorded values reproduces the exported bundles
-exactly. `notebooks/comparison.ipynb` runs GPU-free from the exported JSON.
+exactly.
 
 **The UI.** Free the GPU first: the 8-bit 8B needs roughly 19 GB, so shut down any notebook kernel
 still holding the model, then
@@ -193,11 +192,5 @@ warns if that isn't `$HF_HOME`, so it will not silently re-download 15 GB.
 
 ## Documentation
 
-- [`docs-for-nimun/safety_probes_plan.md`](docs-for-nimun/safety_probes_plan.md) — the decision
-  record: every numbered revision, what changed and why.
-- [`docs-for-nimun/data_reference.md`](docs-for-nimun/data_reference.md) — for each behaviour, the
-  exact prompts with probed tokens highlighted and steered tokens marked. Every block is a real pull
-  from the seed-42 splits.
-- [`docs-for-nimun/sycophancy_plan.md`](docs-for-nimun/sycophancy_plan.md) — the third behaviour's
-  design, including its genuine-agreement control.
-- [`docs-for-nimun/papers/`](docs-for-nimun/papers/) — the four source papers.
+The full design rationale is written up in the report under `research-report/`; the notebooks
+carry their own section-by-section commentary.

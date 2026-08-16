@@ -10,9 +10,12 @@ deception-detection/
 .env
 *.env
 
-# Agent transcripts. Never commit: an IDE-selection block can paste .env contents verbatim
-# into a transcript, which is how both live keys leaked in the pre-rewrite history.
-docs-for-nimun/claude-conversations/
+# Working notes, decision records, source-paper PDFs, and agent transcripts — local only.
+# The transcripts in particular must never be committed: an IDE-selection block can paste .env
+# contents verbatim into a transcript, which is how both live keys leaked in the pre-rewrite
+# history. Nothing in here is needed to run the notebooks (utils.py is the superseded ARENA
+# helper; its needed functions are vendored into safety_probes/chat.py and viz.py).
+docs-for-nimun/
 
 # --- NOT ignored, deliberately -----------------------------------------------------------
 # data/            ~500 KB of vendored Apollo files; frozen inputs, must be versioned.
