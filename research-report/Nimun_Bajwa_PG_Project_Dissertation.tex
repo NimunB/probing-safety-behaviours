@@ -207,14 +207,14 @@ are available at \url{https://github.com/NimunB/probing-safety-behaviours}.
 
 \paragraph{Probing activations}
 Linear probes were introduced by \citet{alain2018}, who trained linear
-classifiers (using multinomial logistic regression) on the activations of each
+classifiers on the activations of each
 layer of image models (Inception v3, ResNet-50) for the objective of predicting
 the image recognition task's own classes (MNIST, ImageNet). They noted
 that the technique could be used as a general instrument for monitoring the
 features of any objective. \citet{azaria2023} brought probing to language-model
 truthfulness, training classifiers on hidden activations to predict whether a
-statement is true. \citet{levinstein2024} then showed such probes fail to
-generalise in elementary ways, most famously to negations --- failures which,
+statement is true. \citet{levinstein2024} showed such probes fail to
+generalise in elementary ways, like to negations --- failures which,
 as \citet{marks2024} put it, suggest the probes `may be identifying not truth,
 but other features that correlate with truth on their training data'. That
 critique informs this study's decision to treat causal testing (steering) as
@@ -225,17 +225,10 @@ Later work explores new ways to train probes. Inference-time intervention (ITI;
 \citealt{li2023}) fits one sigmoid probe per attention head and uses validation
 probe accuracy to select the top-K heads to intervene on. Their use of probing
 as a localisation instrument informs our selection of the detection layer by
-cross-validated AUROC. ITI introduces the mass-mean shift: steering along the
-difference of the class means. \citet{marks2024} take this method a step
-further by repurposing the mass-mean steering direction as a classification
+cross-validated AUROC. ITI also introduces the mass-mean shift: steering along the
+difference of the class means. \citet{marks2024} repurpose the mass-mean steering direction as a classification
 method, finding it underperforms on logistic regression probes for LLaMA-2-7B,
-but classifies comparably on larger models (13B, 70B). Their insistence on
-out-of-distribution evaluation reinforced ours. Representation engineering
-(RepE; \citealt{zou2023}) reads concepts without labels, extracting ``reading
-vectors'' by PCA over stimulus activations (Linear Artificial Tomography), and
-states that reading techniques of any kind ``only provide evidence of a
-correlation''; stronger conclusions require intervention and causal
-experiments.
+but classifies comparably on larger models (13B, 70B).
 
 \paragraph{Steering activations}
 Steering involves adding a direction to a model's internal activations during a
@@ -244,12 +237,10 @@ with Activation Addition \citep{turner2023}, which derives its direction from
 the activation difference of a single pair of contrasting prompts.
 
 ITI
-\citep{li2023} steers the outputs of selected attention heads --- the one
+\citep{li2023} aims to elicit truth, steering on the outputs of selected attention heads --- the one
 intervention site here that is not the residual stream --- comparing three
 candidate directions at the same heads: the probe's own weight direction
-(logistic regression), the mass-mean direction (``the vector pointing from the
-false mean to the truthful mean''), and a CCS direction \citep{burns2023}, with
-steered TruthfulQA generations scored by fine-tuned GPT-judge classifiers. The
+(logistic regression), the mass-mean direction, and a CCS direction \citep{burns2023}. The
 mass-mean steering won decisively. This is the earliest form of the read/write
 dissociation: the direction a classifier learns is measurably worse at steering
 than the difference of the class means.
@@ -262,21 +253,12 @@ protocol, evaluated by a normalised indirect effect on the model's own readout
 find the mass-mean direction the most causally implicated. Our primary causal
 metric, its calibration, and steering logic are taken from them.
 
-RepE
-\citep{zou2023} steers honesty on contrast pairs built from the same
-Azaria--Mitchell facts our deception probes train on, but reuses its
-reading vectors as steering vectors, never asking whether the direction that
-best reads a concept is the one that best writes it; that question is this
-work's centre.
-
 Contrastive activation addition (CAA; \citealt{rimsky2024}) carries
 difference-of-means steering of the residual stream into open-ended generation.
 Its vector is the mean activation difference over hundreds of matched
 multiple-choice pairs (where Activation Addition used a single pair) --- the
-same question ending in answer ``A'' or ``B'', one option exhibiting the
-behaviour --- which, for matched pairs, is exactly the difference of the class
-means. Added to the residual stream during decoding with a signed multiplier,
-it steers seven alignment-relevant behaviours (among them sycophancy) in
+same question ending in answer ``A'' or ``B'', with one option exhibiting the
+behaviour. It steers seven alignment-relevant behaviours (among them sycophancy) in
 Llama-2 chat models, evaluated by a constrained single-token (A/B
 multiple-choice answer) readout under steering, and by a prompted LLM judge
 scoring generations 1--10 --- both evaluations we adopt or adapt.
@@ -288,8 +270,7 @@ our behaviours steers at its own layers.
 
 \paragraph{Deception}
 Language models can behave deceptively even when trained to be honest, and
-output-level monitoring is hard precisely because a capable deceiver's outputs
-are engineered to look honest, which supplies the motivation for looking at
+monitoring the outputs can prove ineffective if they are engineered to look honest. This supplies the motivation for looking at
 model internals instead \citep{goldowsky2025}. Apollo train several probes on
 Llama-3.3-70B-Instruct --- logistic regression, difference-of-means, LDA, LAT
 and SAE-feature probes --- and evaluate the models' out-of-distribution
@@ -304,10 +285,7 @@ instruction-contrast over Azaria--Mitchell's true statements, and we use their
 Roleplaying and AI Liar \citep{pacchiardi2024} evaluation sets.
 
 \paragraph{High Stakes Awareness}
-As increasingly powerful AI systems deploy through society, monitoring has been
-proposed to mitigate misuse and harm, and internal activations offer a
-cost-effective first line of defence, far lighter than chain-of-thought
-analysis \citep{mckenzie2025}. Their probes detect high-stakes interactions ---
+\citeauthor{mckenzie2025}'s probes detect high-stakes interactions ---
 contexts where an LLM's actions could carry substantial real-world
 consequences, such as giving investment advice. They exclusively use the
 logistic regression probe, but study the effects of different token pooling

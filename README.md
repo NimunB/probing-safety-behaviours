@@ -76,8 +76,8 @@ Best out-of-distribution detector, and best steerer, per behaviour:
 
 | | Deception | High-stakes | Sycophancy |
 |---|---|---|---|
-| Detection layer / steering block | 12 / 15–19 | 13 / 8–12 | 19 / 5–9 |
-| Best OOD detector | LR (mean) 0.722 | LR (mean) 0.826 | **MM (last) 0.879** |
+| Detection layer / steering block | 12 / 11–15 | 20 / 6–10 | 19 / 6–10 |
+| Best OOD detector | LR (mean) 0.722 | LR (mean) 0.774 | **MM (last) 0.879** |
 | Best steerer (NIE) | MM | MM | **LR-attention** |
 | Read/write dissociation | holds | holds | **inverts** |
 
@@ -94,6 +94,13 @@ It computes everything live from your input and stores no activations. It shares
 ---
 
 ## Setup
+
+**Requirements.** An NVIDIA GPU with at least 24 GB of memory (RTX 3090/4090/5090, A5000, or
+similar) — this applies to the notebooks and the UI alike, since both load the live model. The
+model loads in 8-bit via bitsandbytes, which is CUDA-only, so Apple Silicon and CPU-only machines
+cannot run either; from such a machine, reach a GPU box over the SSH tunnel described below.
+Expect ~15 GB of disk for the model download plus several GB for the activation cache. The
+LLM-judge cells need an `ANTHROPIC_API_KEY` and skip cleanly without one.
 
 ```bash
 # 1. Isolated venv (or reuse /venv/main).
