@@ -5,7 +5,7 @@ Run from research-report/ after any pipeline re-run:
 
     ../.venv/bin/python make_appendix_tables.py     # or /venv/main/bin/python
 
-Writes appendix_tables.tex, which report_v3.tex \\inputs. Regenerating after a re-run is the
+Writes appendix_tables.tex, which the report \\inputs. Regenerating after a re-run is the
 whole point: the appendix numbers then cannot drift from the artefacts they came from.
 """
 from __future__ import annotations
@@ -31,7 +31,7 @@ def detection_table(slug: str, title: str) -> str:
     probes = list(dict.fromkeys(r["probe"] for r in rows))
     by = {(r["probe"], r["eval"]): r for r in rows}
 
-    L = [r"\begin{table}[tb]", r"\caption{%s --- detection. AUROC with bootstrap 95\%% CI; "
+    L = [r"\begin{table}[H]", r"\caption{%s --- detection. AUROC with bootstrap 95\%% CI; "
          r"TPR at 1\%% FPR (\texttt{n/a} where a set has $<$100 negatives, so 1\%% FPR is "
          r"unreachable).}" % title,
          r"\label{tab:app-det-%s}" % slug.replace("-", ""), r"\centering", r"\scriptsize",
@@ -73,7 +73,7 @@ def steering_table(slug: str, title: str) -> str:
             cap += (r" Judge rows are omitted: the judge arm is skipped for this set, whose "
                     r"generation prompts are byte-identical under greedy decoding.")
         cap += "}"
-        L = [r"\begin{table}[tb]", cap,
+        L = [r"\begin{table}[H]", cap,
              r"\label{tab:app-steer-%s-%s}" % (slug.replace("-", ""), re.sub(r"\W", "", evalset)),
              r"\centering", r"\scriptsize", r"\setlength{\tabcolsep}{3pt}",
              r"\begin{tabular}{ll" + "r" * len(coefs) + "}", r"\toprule",
