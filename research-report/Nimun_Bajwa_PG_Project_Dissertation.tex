@@ -884,31 +884,36 @@ In-distribution detection is near-ceiling: four of the five probes reach
 $\geq 0.996$ AUROC and three reach exactly 1.000
 (Appendix~\ref{app:det-tables}, Table~\ref{tab:app-det-deception}).
 
-The two out-of-distribution sets separate (Fig.~\ref{fig:roc}a--b). Every probe
+The two out-of-distribution sets separate (Appendix~\ref{app:roc-ood},
+Fig.~\ref{fig:roc}a--b). Every probe
 scores highly on AI Liar, spanning 0.818--0.992 with \texttt{MM (mean)}
 highest; every probe falls on roleplaying, spanning 0.554--0.706 with
 \texttt{LR (mean)} highest. The ranking is not preserved between them:
 \texttt{MM (mean)} is first on AI Liar and fourth on roleplaying. On the two
 sets pooled, \texttt{LR (mean)} leads at 0.722.
 
-
-\begin{figure*}[t]
-\centering
-\begin{tabular}{@{}c@{\hspace{1.5mm}}c@{\hspace{1.5mm}}c@{\hspace{1.5mm}}c@{}}
-\figslot{deception/roc_ai_liar.png}{0.24\textwidth}{2.3cm} &
-\figslot{deception/roc_roleplaying.png}{0.24\textwidth}{2.3cm} &
-\figslot{high_stakes/roc_ood.png}{0.24\textwidth}{2.3cm} &
-\figslot{sycophancy/roc_ood.png}{0.24\textwidth}{2.3cm} \\[1pt]
-{\footnotesize (a) deception: AI Liar} & {\footnotesize (b) deception: roleplaying} &
-{\footnotesize (c) high-stakes: Anthropic-HH} & {\footnotesize (d) sycophancy: math} \\
-\end{tabular}
-\caption{Out-of-distribution ROC curves for deception, high stakes, and
-sycophancy. Full grids in Appendix~\ref{app:det-tables}; the in-distribution
-curves are in Appendix~\ref{app:roc-id}.}
-\label{fig:roc}
-\end{figure*}
-
 \subsubsection{Steering}
+The in-distribution readout is degenerate. The model answers \textsc{no} to the
+deception question for both classes ($PD^{+}=-0.906$, $PD^{-}=-0.964$), leaving
+a class gap of $+0.058$; dividing by it inflates every in-distribution NIE
+roughly eighteenfold relative to the AI Liar gap of $+1.052$. Those values
+(Appendix~\ref{app:steer-id}, Fig.~\ref{fig:app-steer-id}a) are reported but
+carry no weight.
+
+Mass-mean gives the largest readout shift on both out-of-distribution sets,
+though the effects are far smaller on AI Liar than on roleplaying. On AI Liar
+they reach $+0.005$ at coefficient $+1$ and $+0.046$ at $+2$, against $-0.047$
+and $-0.087$ for logistic regression (Fig.~\ref{fig:steer}a). On roleplaying
+mass-mean reaches $+0.134$ at $+1$ and $+0.349$ at $+2$, the attention
+direction $+0.088$ and $+0.214$, and logistic regression stays flat
+(Appendix~\ref{app:steer-rp}, Fig.~\ref{fig:app-steer-rp}).
+
+The judge adds little for this behaviour. The in-distribution arm is skipped by
+design, its generation prompts being byte-identical under greedy decoding, and
+on AI Liar judged behaviour moves at most 1.4 points from a 2.13 baseline.
+Judged coherence moves further than behaviour on that set, rising from 5.08 to
+8.71 under mass-mean at $+1$.
+
 
 \begin{figure}[t]
 \centering
@@ -945,7 +950,7 @@ next at 0.993 (Appendix~\ref{app:det-tables},
 Table~\ref{tab:app-det-highstakes}).
 
 On OOD (Anthropic-HH) every probe falls by between 0.20 and 0.28
-(Fig.~\ref{fig:roc}c). \texttt{LR (mean)} leads at 0.774, followed by
+(Appendix~\ref{app:roc-ood}, Fig.~\ref{fig:roc}c). \texttt{LR (mean)} leads at 0.774, followed by
 \texttt{LR-attention} at 0.755 and \texttt{MM (mean)} at 0.737; the two
 last-token probes come last at 0.687 and 0.686. The logistic-regression family
 leads both sets, and the ordering is otherwise stable except
@@ -953,6 +958,21 @@ leads both sets, and the ordering is otherwise stable except
 
 
 \subsubsection{Steering}
+Mass-mean gives the largest readout shift at every positive coefficient on both
+sets. On OOD the response is monotone --- $+0.23$, $+0.72$, $+1.34$ at
+coefficients $+0.5$, $+1$ and $+2$ --- against $+0.12$ for logistic regression
+and $+0.25$ for the attention direction at $+1$ (Fig.~\ref{fig:steer}b). The
+same ordering holds in-distribution (Appendix~\ref{app:steer-id},
+Fig.~\ref{fig:app-steer-id}b), though mass-mean's margin over the attention
+direction narrows to 0.03 at $+2$.
+
+The judge agrees in-distribution but not out of it. In-distribution, mass-mean
+moves judged behaviour across the whole sweep --- 2.46 at $-2$, 4.08 unsteered,
+5.88 at $+1$, 7.54 at $+2$ --- where logistic regression reaches 5.00 at $+1$.
+On Anthropic-HH the same direction moves the readout a full class gap at $+2$
+($+1.34$) while judged behaviour rises only from 1.67 to 2.38 and judged
+coherence falls from 6.21 to 3.92. The logistic-regression and attention
+directions never reduce coherence by more than 0.25 on either set.
 
 \subsection{Sycophancy}
 
@@ -969,8 +989,31 @@ it is flat, every layer within 0.01 of zero. The training-split readout gap
 serving as the sweep's denominator is $+1.034$.
 
 \subsubsection{Detection (Probing)}
+\texttt{MM (last)} is the best detector on both sets: 0.976 in-distribution and
+0.879 on math (Appendix~\ref{app:det-tables},
+Table~\ref{tab:app-det-sycophancy}). In-distribution scores are otherwise
+tightly grouped, spanning 0.928--0.976; on OOD (math) they span 0.802--0.879
+(Appendix~\ref{app:roc-ood}, Fig.~\ref{fig:roc}d).
 
+Last-token pooling beats mean pooling for both estimators and on both sets ---
+on math, 0.879 against 0.802 for mass-mean and 0.847 against 0.825 for
+logistic regression --- and the logistic-regression family leads neither set.
 \subsubsection{Steering}
+The attention direction is the only one with a monotone readout response:
+$+0.25$, $+0.54$, $+0.77$ at coefficients $+0.5$, $+1$ and $+2$ on math, and
+$+0.16$, $+0.36$, $+0.81$ in-distribution (Fig.~\ref{fig:steer}c;
+Appendix~\ref{app:steer-id}, Fig.~\ref{fig:app-steer-id}c). Mass-mean is
+non-monotone: it rises at $+0.5$, turns negative at $+1$ ($-0.53$
+in-distribution, $-0.92$ on math), and returns positive at $+2$. Logistic
+regression stays within 0.07 of zero throughout.
+
+The judge orders them the other way. The only generations judged sycophantic
+anywhere in the sweep come from mass-mean at $+1$ --- 9.71 in-distribution and
+9.42 on math, from baselines of 1.08 and 1.04 --- the same coefficient at which
+its readout is negative. Judged coherence there falls to 2.88 and 4.17 from
+8.58 and 8.17, and at $+2$ both behaviour and coherence reach 1.00. The
+attention direction's judged behaviour stays between 1.00 and 1.21 across the
+positive half of the sweep, even as its readout climbs to $+0.77$.
 
 \subsection{Synthesis}
 
@@ -1321,6 +1364,26 @@ top-down approach to AI transparency', \textit{arXiv preprint} arXiv:2310.01405.
 \appendices
 
 \input{appendix_tables}
+
+\section{Out-of-Distribution ROC Curves}\label{app:roc-ood}
+Held-out out-of-distribution curves for all five probes per behaviour; these are the
+curves the read-side comparison rests on (§III-B.3).
+
+\begin{figure}[H]
+\centering
+\begin{tabular}{@{}c@{\hspace{1.5mm}}c@{\hspace{1.5mm}}c@{\hspace{1.5mm}}c@{}}
+\figslot{deception/roc_ai_liar.png}{0.24\textwidth}{2.3cm} &
+\figslot{deception/roc_roleplaying.png}{0.24\textwidth}{2.3cm} &
+\figslot{high_stakes/roc_ood.png}{0.24\textwidth}{2.3cm} &
+\figslot{sycophancy/roc_ood.png}{0.24\textwidth}{2.3cm} \\[1pt]
+{\footnotesize (a) deception: AI Liar} & {\footnotesize (b) deception: roleplaying} &
+{\footnotesize (c) high-stakes: Anthropic-HH} & {\footnotesize (d) sycophancy: math} \\
+\end{tabular}
+\caption{Out-of-distribution ROC curves for deception, high stakes, and
+sycophancy. Full grids in Appendix~\ref{app:det-tables}; the in-distribution
+curves are in Appendix~\ref{app:roc-id}.}
+\label{fig:roc}
+\end{figure}
 
 \section{In-Distribution ROC Curves}\label{app:roc-id}
 Fig.~\ref{fig:roc-id} is the in-distribution counterpart of Fig.~\ref{fig:roc},
