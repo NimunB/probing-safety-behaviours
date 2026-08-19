@@ -36,8 +36,10 @@
 \usepackage{amsmath,amssymb,amsfonts}
 \usepackage{graphicx}
 \usepackage{textcomp}
-\usepackage{xcolor}
+\usepackage[table]{xcolor}
 \usepackage{booktabs}
+\usepackage{tabularx}
+\usepackage{array}
 \usepackage{multirow}
 \usepackage{url}
 \usepackage{float}
@@ -529,7 +531,7 @@ only present in the reply.
 
 \paragraph{Evaluation Data}
 \textbf{Math} (\citealt{cincynlp2025}; 1,000 examples). This is the fifth
-factorial domain provided by CincyNLP, which we use as our OOD set, as it is a
+factorial domain provided by \citeauthor{cincynlp2025}, which we use as our OOD set, as it is a
 domain shift. Otherwise, examples have the same construction, label mapping,
 and detection mask (e.g.\ ``I believe $18 - 12 = 5$''; Appendix~\ref{app:syc-ood},
 Fig.~\ref{fig:sycood}). We subsample 500 from each class (sycophantic/candid)
@@ -1253,10 +1255,11 @@ Chen, Y., Wu, A., DePodesta, T., et al. (2024) `Designing a dashboard for
 transparency and control of conversational AI', \textit{arXiv preprint}
 arXiv:2406.07882.
 
-\bibitem[CincyNLP(2025)]{cincynlp2025}
-CincyNLP (2025) \textit{Disentangling sycophancy: factorial evaluation
-datasets}. Available at: \url{https://github.com/cincynlp/disentangle-sycophancy}
-(Accessed: 30 July 2026).
+\bibitem[Vennemeyer et al.(2025)]{cincynlp2025}
+Vennemeyer, D., Duong, P.A., Zhan, T. and Jiang, T. (2025) `Sycophancy is not
+one thing: causal separation of sycophantic behaviors in LLMs',
+\textit{arXiv preprint} arXiv:2509.21305. Data:
+\url{https://github.com/cincynlp/disentangle-sycophancy}.
 
 \bibitem[Cunningham et al.(2023)]{cunningham2023}
 Cunningham, H., Ewart, A., Riggs, L., Huben, R. and Sharkey, L. (2023) `Sparse
@@ -1993,21 +1996,100 @@ situation, a user's claim), which must itself be moved for the completion to
 change. Hence the rule stated in §\ref{sec:steering}: steer the item, never the
 apparatus.
 
-\section{Statement on the Use of Generative AI Tools}
+\clearpage
+\section{Generative AI Declaration}
 \label{app:genai}
-The following is a factual record of generative-AI use, for transfer into the
-departmental declaration template.
-\emph{(i) Code.} An AI coding assistant was used to help implement and refactor the package, write
-driver-notebook scaffolding, and diagnose defects (for example a double-BOS tokenisation defect in the
-detection-mask construction). All code was reviewed and executed by the author, and all reported numbers were produced by
-running it.
-\emph{(ii) Literature comparison.} An AI assistant was used to cross-check the implementation against
-the source papers section by section; the author verified each discrepancy against the papers
-directly.
-\emph{(iii) Writing.} An AI assistant was used to draft and edit prose. The research questions,
-experimental design, results and conclusions are the author's own.
-\emph{(iv) As an experimental component.} Claude Haiku 4.5 is used \emph{within} the methodology as
-the LLM judge scoring steered generations (§III-D.1); this is a measured component of the system, not a
-writing aid.
+\setlength{\parindent}{0pt}
+\setlength{\parskip}{0.5em}
+\renewcommand{\arraystretch}{1.3}
+
+\begin{center}
+\textbf{ECS750P/ECS753P/ECS754P -- MSc Project Module}\\
+\textbf{Generative AI Tools -- Student Accountability Statement}
+\end{center}
+
+\textbf{Student Name:} Nimun Kaur Bajwa (250828810)\\
+\textbf{Project Title:} Probing and Steering for Safety-Relevant Behaviours in LLMs\\
+\textbf{Supervisor Name:} Massimo Poesio
+
+\textbf{1. Have you used Generative AI tools for your project?}\\
+\textbf{YES}
+
+\textbf{2. Please provide details of all the AI tools that you used in your
+project work.}
+
+\begin{tabularx}{\textwidth}{|p{3.6cm}|p{3.4cm}|p{3.4cm}|X|}
+\hline
+\rowcolor[gray]{0.92}
+AI Tool & Version & Publisher & Access URL \\
+\hline
+Claude Code & Opus & Anthropic & \url{https://claude.ai/code} \\
+\hline
+Claude (API) & \texttt{claude-haiku-4-5} & Anthropic & \url{https://www.anthropic.com/api} \\
+\hline
+\end{tabularx}
+
+\textbf{3. If you have used Artificial Intelligence (AI) tools in any part of
+your project please include in table format how, where, and why these tools
+were used.}
+
+\begin{tabularx}{\textwidth}{|>{\raggedright\arraybackslash}p{2.4cm}
+                             |>{\raggedright\arraybackslash}p{3.0cm}
+                             |>{\raggedright\arraybackslash}X|}
+\hline
+\rowcolor[gray]{0.92}
+Project Section & Description & Justification \\
+\hline
+Code (\texttt{safety\_probes} package, notebooks)
+& Coding assistant used to implement and refactor the package, write
+driver-notebook scaffolding, and diagnose defects (e.g.\ a double-BOS
+tokenisation defect in the detection-mask construction)
+& I specified the design and the numbered decision record the code implements;
+the assistant produced and revised code against it. All code was reviewed and
+executed by me, and all reported numbers were produced by running it. \\
+\hline
+Methodology (faithfulness to source papers)
+& Assistant used to cross-check the implementation against the source papers
+section by section
+& I asked for discrepancies between my implementation and the papers'
+protocols; I verified each flagged discrepancy against the papers directly and
+decided the resolution. \\
+\hline
+Report writing
+& Assistant used to draft and edit prose, verify quoted numbers against the
+exported artefacts, and manage \LaTeX{} layout
+& Drafts were produced to my outlines and revised or rewritten by me before
+inclusion; every number was checked against the pipeline's exported results.
+The research questions, experimental design, results and conclusions are my
+own. \\
+\hline
+Experimental component (LLM judge)
+& Claude Haiku 4.5 is used \emph{within} the methodology as the LLM judge
+scoring steered generations (\S III-D.1)
+& This is a measured component of the system itself, not a writing or coding
+aid; its prompts are in Appendix~\ref{app:judge} and its lack of blind
+validation is a declared limitation. \\
+\hline
+\end{tabularx}
+
+\textbf{4. Generative AI Student Declaration}
+
+\begin{itemize}
+\setlength{\itemsep}{0.2em}
+\item I have declared all uses of AI tools (e.g., coding assistants, text
+generators, data analysis tools) in this project.
+\item I have reviewed and verified all AI-assisted content to ensure accuracy
+and suitability.
+\item I take full responsibility for the originality and integrity of my
+project submission.
+\item I have referenced all sources, including those suggested or produced with
+AI support.
+\item I have not used AI in ways that undermine academic honesty (e.g.,
+plagiarism, unverified code submission).
+\item My use of AI was supplementary and did not replace my own independent
+learning and problem-solving.
+\end{itemize}
+
+Signed: Nimun Kaur Bajwa \hspace{2em} Date: \underline{\hspace{2.5cm}}
 
 \end{document}
