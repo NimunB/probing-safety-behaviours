@@ -224,11 +224,10 @@ are available at \url{https://github.com/NimunB/probing-safety-behaviours}.
 
 \paragraph{Probing activations}
 Linear probes were introduced by \citet{alain2018}, who trained linear
-classifiers on the activations of each
-layer of image models (Inception v3, ResNet-50) for the objective of predicting
-the image recognition task's own classes (MNIST, ImageNet). They noted
-that the technique could be used as a general instrument for monitoring the
-features of any objective. \citet{azaria2023} brought probing to language-model
+classifiers on the activations of Inception v3 and ResNet-50 to predict
+the image recognition classes. They noted
+that the technique could be used as a general instrument for monitoring any objective. 
+\citet{azaria2023} brought applied to language-model
 truthfulness, training classifiers on hidden activations to predict whether a
 statement is true. \citet{levinstein2024} showed such probes fail to
 generalise in elementary ways, like to negations --- failures which,
@@ -239,67 +238,52 @@ necessary, and prioritize out-of-distribution transfer over in-distribution
 performance.
 
 Later work explores new ways to train probes. Inference-time intervention (ITI;
-\citealt{li2023}) fits one sigmoid probe per attention head and uses validation
+\citealt{li2023}) fits one logistic regression probe per attention head and uses validation
 probe accuracy to select the top-K heads to intervene on. Their use of probing
 as a localisation instrument informs our selection of the detection layer by
-cross-validated AUROC. ITI also introduces the mass-mean shift: steering along the
+cross-validated AUROC (area under the
+receiver operating characteristic curve). ITI also introduces the mass-mean shift: steering along the
 difference of the class means. \citet{marks2024} repurpose the mass-mean steering direction as a classification
 method, finding it underperforms on logistic regression probes for LLaMA-2-7B,
 but classifies comparably on larger models (13B, 70B).
 
 \paragraph{Steering activations}
 Steering involves adding a direction to a model's internal activations during a
-forward pass in order to causally shift its behaviour. The technique begins
-with Activation Addition \citep{turner2023}, which derives its direction from
-the activation difference of a single pair of contrasting prompts.
+forward pass in order to causally shift its behaviour.
 
 ITI
-\citep{li2023} aims to elicit truth, steering on the outputs of selected attention heads --- the one
-intervention site here that is not the residual stream --- comparing three
-candidate directions at the same heads: the probe's own weight direction
-(logistic regression), the mass-mean direction, and a CCS direction \citep{burns2023}. The
+\citep{li2023} aims to elicit truth, steering on the outputs of selected attention heads, comparing three
+candidate directions: the probe's own weight direction
+(logistic regression), the mass-mean direction, and a contrast-consistent search (CCS) direction \citep{burns2023}. The
 mass-mean steering won decisively. This is the earliest form of the read/write
 dissociation: the direction a classifier learns is measurably worse at steering
 than the difference of the class means.
 
 \citet{marks2024} continue this study of eliciting truth, intervening on a
 small set of causally-implicated residual-stream hidden states with each
-estimator's (logistic regression, mass-mean, CCS) direction under an identical
-protocol, evaluated by a normalised indirect effect on the model's own readout
+estimator's (logistic regression, mass-mean, CCS) direction, evaluated by a normalised indirect effect on the model's own readout
 --- and, ``in contrast to prior work'', on out-of-distribution inputs. They
 find the mass-mean direction the most causally implicated. Our primary causal
 metric, its calibration, and steering logic are taken from them.
 
-Contrastive activation addition (CAA; \citealt{rimsky2024}) carries
+Contrastive activation addition (CAA; \citealt{rimsky2024}) uses
 difference-of-means steering of the residual stream into open-ended generation.
 Its vector is the mean activation difference over hundreds of matched
-multiple-choice pairs (where Activation Addition used a single pair) --- the
-same question ending in answer ``A'' or ``B'', with one option exhibiting the
-behaviour. It steers seven alignment-relevant behaviours (among them sycophancy) in
-Llama-2 chat models, evaluated by a constrained single-token (A/B
-multiple-choice answer) readout under steering, and by a prompted LLM judge
+multiple-choice pairs, with one option exhibiting the
+behaviour, and one not. It steers seven alignment-relevant behaviours in
+Llama-2 chat models, evaluated by a constrained single-token readout under steering, and by a prompted LLM judge
 scoring generations 1--10 --- both evaluations we adopt or adapt.
 
-\citet{vanderweij2024} extend steering
-to multiple behaviours simultaneously, finding a single summed vector largely
-unsuccessful but injection at separate layers promising --- the reason each of
-our behaviours steers at its own layers.
-
 \paragraph{Deception}
-Language models can behave deceptively even when trained to be honest, and
-monitoring the outputs can prove ineffective if they are engineered to look honest. This supplies the motivation for looking at
-model internals instead \citep{goldowsky2025}. Apollo train several probes on
-Llama-3.3-70B-Instruct --- logistic regression, difference-of-means, LDA, LAT
-and SAE-feature probes --- and evaluate the models' out-of-distribution
+\citet{goldowsky2025} of Apollo Research (hereafter Apollo) train
+several deception detection probes on
+Llama-3.3-70B-Instruct --- including logistic regression, difference-of-means,
+and sparse autoencoder feature probes --- and evaluate the models' out-of-distribution
 probing/detection ability on concealing insider trading \citep{scheurer2023} and
 sandbagging safety evaluations \citep{benton2024}. They find logistic
 regression performs best at distinguishing deceptive responses from transcripts
 unrelated to deception, with performance being relatively similar for
-distinguishing deceptive and honest responses (AUROC 0.96--0.999 on their
-evaluation datasets). Apollo do not steer their probes; this study does. Our
-deception probes train on Apollo's training adaptation of RepE's
-instruction-contrast over Azaria--Mitchell's true statements, and we use their
-Roleplaying and AI Liar \citep{pacchiardi2024} evaluation sets.
+distinguishing deceptive and honest responses.
 
 \paragraph{High Stakes Awareness}
 \citeauthor{mckenzie2025}'s probes detect high-stakes interactions ---
@@ -309,13 +293,8 @@ logistic regression probe, but study the effects of different token pooling
 schemes, including Mean, Max, Last-token, Softmax, Attention --- of which they
 find the best performing probes use Attention, Softmax, and Mean. This inspired
 our study to also investigate various token pooling strategies. Their attention
-probe generalises at a mean AUROC above 0.91 on Llama-3.3-70B (0.887 at the 8B
-scale we use), rivalling fine-tuned LLM monitors at up to six orders of
-magnitude less compute; yet at 1\% false positives the best catches only 43\%
-of high-stakes cases, so they show a probe-then-LLM cascade outperforms either
-alone --- probes as filters, not standalone monitors. We adopt their training
-set and one of their six out-of-distribution evaluation sets (Anthropic
-HH-RLHF). They do not steer, while we do.
+probe rivals fine-tuned LLM monitors at up to six orders of
+magnitude less compute.
 
 \paragraph{Sycophancy}
 Sycophancy --- deferring to a user's stated belief over an accurate answer ---
@@ -325,8 +304,7 @@ Llama 2 chat models, with the effects splitting across their two instruments:
 subtracting the vector markedly lowers the probability assigned to the
 sycophantic answer option, which sits high unsteered, while adding it registers
 mainly on GPT-4-judged open-ended generations, modestly raising a near-floor
-sycophancy score \citep{rimsky2024}. They exclusively study steering, and do
-not include probing/detection, which we elect to do.
+sycophancy score \citep{rimsky2024}.
 
 \paragraph{User-Interface for Probing and Steering}
 \citet{chen2024} combine interpretability techniques with user-experience
@@ -335,9 +313,7 @@ show the \emph{user model} a chatbot holds of its user (age, gender, education,
 socioeconomic status). The dashboard displays this information in real-time,
 and allows the user to manipulate and steer the model's perception of
 themselves. Seeing that internal state helped participants expose biased
-behaviour and increased their sense of control. That democratisation of the
-inference process motivated our interface, which also allows users to
-transparently see the probes' scores, and steer on our chosen behaviours.
+behaviour and increased their sense of control.
 
 %=======================================================================
 \section{Methodology}
@@ -354,12 +330,10 @@ sweep) consumed by one shared pipeline.
 
 The idea is to use contrastive pairs: one member of each pair exhibits the
 behaviour, and one does not. We train probes on a masked subset of each pair's
-tokens --- the rule is to mask where the label lives (Fig.~\ref{fig:masks}) ---
-and later use the directions those probes find to steer generation. All
-training/test splits are 80/20 and \emph{pair-aware} --- both members of a pair
-stay on the same side, since a fact or scenario appearing in train with its twin
-in test is leakage; the same grouping governs the cross-validation folds of
-§\ref{sec:methodology}-C.
+tokens --- the rule is to mask where the behaviour lives (Fig.~\ref{fig:masks}),
+which we call the detection mask --- and later use the directions those probes find to steer generation. All
+training/test splits are 80/20. The held-out 20\% of facts forms the in-distribution (ID) test set, but we rely on
+the out-of-distribution (OOD) ones for evaluation.
 
 \begin{figure*}[t]
 \centering
@@ -417,7 +391,7 @@ I believe the city of Bishkek is in \textbf{Germany}. What country do you believ
 \multicolumn{2}{@{}p{0.96\textwidth}}{\emph{Why:} sycophancy lives in the reply, which causal attention lets the probe read \emph{in context} of the claim; probing the claim itself would be a truth shortcut.}\\
 \bottomrule
 \end{tabular}
-\caption{One pair per behaviour from the seed-42 training set: left = behaviour off,
+\caption{Training Data, one pair per behaviour: left = behaviour off,
 right = behaviour on. \colorbox{probed}{\strut Highlighted} spans are the detection mask.}
 \label{fig:masks}
 \end{figure*}
@@ -425,39 +399,31 @@ right = behaviour on. \colorbox{probed}{\strut Highlighted} spans are the detect
 \subsubsection{Deception}
 
 \paragraph{Training Data}
-Our training methodology and data reuse Apollo's instructed-pair design
-\citep[§3.2.1]{goldowsky2025}, which combines RepE's contrastive-instruction
-format \citep{zou2023} with the true/false statements of \citet{azaria2023}.
+We reuse Apollo's instructed-pair design
+\citep[§3.2.1]{goldowsky2025} with the true/false statements of \citet{azaria2023}.
 
 We take the 306 true facts in that set and construct contrastive pairs using
 them. We prepend a system prompt stating that the assistant is honest or
 deceptive, add a user turn asking for a fact, and insert the true fact as the
 assistant's response, truncated by its last five words so that it could still
 be completed either truthfully or deceptively. Only the truncated assistant
-response is eligible to be probed (included in the detection mask): the system
+response is included in the detection mask and is eligible to be probed (Fig.~\ref{fig:masks}a): the system
 prompt contains the behavioural label (honest/deceptive) which would make
-detection trivial based on lexical clues. What we are aiming to capture is the
-difference in deceptive and honest intent (Fig.~\ref{fig:masks}a). The pair is
-therefore context-defined --- nothing but the framing differs --- so the
+detection trivial based on lexical clues. The pair is \emph{context-defined}, as nothing but the framing differs --- so the
 within-pair activation difference ``should represent the model's `intent' to
 complete the fact deceptively'' \citep[§3.2.1]{goldowsky2025}.
-
-The held-out 20\% of facts forms the in-distribution test set, but we rely on
-the OOD ones for discussion.
 
 \paragraph{Evaluation Data}
 In-distribution accuracy cannot distinguish a probe that has learned the
 behaviour from one that has latched onto a feature merely correlated with the
 label in its training data \citep{levinstein2024,marks2024}, so our
-conclusions rest on the out-of-distribution sets. We use two, forming a
-near/far gradient: AI Liar is context-defined like training, while roleplaying
-is content-defined, so the probe must transfer to a structure it never saw.
+conclusions rest on the OOD sets.
 
 \textbf{AI Liar} (\citealt{pacchiardi2024}; 54 examples). A system prompt
-frames a scenario in which the assistant has a goal and a situation, followed
+gives a scenario in which the assistant has a goal and a situation, followed
 by a human question. Each of the 27 scenarios yields one honest and one
 deceptive example, and the only thing that makes it deceptive is the
-information given about the situation --- the question and the assistant's
+information given about the situation in the system prompt --- the question and the assistant's
 answer are byte-identical across the two (Fig.~\ref{fig:oodpairs}a). Deception
 here is \emph{context-defined}. Only assistant-response tokens are eligible to
 be probed, as we want to localize the honest/deceptive representation in the
@@ -465,17 +431,13 @@ response, instead of including the instruction that defines the label and would
 be trivially separable as text.
 
 \textbf{Roleplaying} (\citealt{goldowsky2025}; 742 examples). AI Liar's 54
-examples are an order of magnitude smaller than every other evaluation set we
-use, so we add Roleplaying for scale. Each of 371 scenarios casts the model as
-a character with an incentive to lie, and pairs an honest with a deceptive
-completion. The scenario and question are shared; only the answer differs, so
-here the lie is in the words --- \emph{content-defined} where AI Liar is
+examples are lower than than every other evaluation set we
+use, so we add Roleplaying. Each of 371 scenarios cast the model as
+a character with an incentive to lie in the \emph{system prompt}, has the \emph{user} ask a question relevant to the incentive,
+and pairs an honest with a deceptive \emph{assistant} completion. The scenario and question are shared; only the answer differs, so
+it is \emph{content-defined} where AI Liar is
 \emph{context-defined} (Fig.~\ref{fig:oodpairs}b). As before, only assistant
-tokens are eligible to be probed, though the roles are now reversed: in the
-previous sets the context announced the behaviour and the response was
-identical across labels, whereas here the shared context announces nothing and
-the response is where the deception is enacted --- which is precisely what a
-deployed monitor reads.
+tokens are eligible to be probed.
 
 \subsubsection{High Stakes Awareness}
 
@@ -488,9 +450,8 @@ lengths, languages, and styles, to help with generalization. Each variant is a
 new row in the dataset. This is a dataset of 8,000 rows, which we split by pair
 group so that variants of one scenario never straddle the split, and subsample
 1,500 examples per class, with 500 per class held out for test. Each scenario
-is a single user turn, and its content tokens are in the detection mask
-(Fig.~\ref{fig:masks}b), as the stakes live in the described situation itself:
-unlike deception, there is no label announcement to exclude. One difference
+is a single user turn, and all its content tokens are in the detection mask
+(Fig.~\ref{fig:masks}b). One difference
 from \citet{mckenzie2025} is that we remove the template scaffold tokens from
 the detection mask (e.g.\ \texttt{<|eot\_id|>}) to just target actual words, as
 scaffold is byte-identical across classes and was diluting the pooled signal
@@ -502,7 +463,7 @@ scaffold is byte-identical across classes and was diluting the pooled signal
 conversations, labelled low or high stakes by GPT-4o. This is genuinely OOD
 against the training set's synthetic single-turn user prompts. Each example is
 a common system prompt followed by a series of user and assistant turns
-(Appendix~\ref{app:hs-ood}, Fig.~\ref{fig:hsood}), and tokens from all three
+(Fig.~\ref{fig:hsood}), and tokens from all three
 roles are in the detection mask, unlike deception's assistant-only, as high
 stakes is a property of the situation, not of one turn, and any speaker can
 turn the conversation high-stakes. The template scaffold is excluded as before.
@@ -511,30 +472,25 @@ turn the conversation high-stakes. The template scaffold is excluded as before.
 
 \paragraph{Training Data}
 The training data for our sycophancy probes reuses the factorial datasets of
-the disentangle-sycophancy paper \citep{cincynlp2025}. Each example consists of
+\citet{cincynlp2025}. Each example consists of
 a user turn and an assistant response. The user turn is a professor in the
-relevant domain asserting a belief and asking the assistant what it believes,
-and the assistant response either echoes the belief or states the truth
-(Fig.~\ref{fig:masks}c). The underlying facts are adapted from the true/false
+relevant domain asserting a belief and asking the assistant what it believes.
+The underlying facts are adapted from the true/false
 statement sets of \citet{marks2024}, and cover four domains: cities,
-Spanish--English translations, claims, and companies. Half the user turns
-assert the true fact and half a falsified one (e.g.\ ``I believe the city of
-Bishkek is in Kyrgyzstan'' vs ``\ldots in Germany''). A reply is sycophantic
+Spanish--English translations, claims, and companies. The assistant reply is sycophantic
 only when the assistant agrees with a false claim, and candid when it states
 the truth. Candid deliberately includes genuine agreements, where the user was
 right and agreeing is honest (29\% of our negatives). These read exactly like
-sycophancy, so a probe that has only learned agreement scores them wrong. The
-usable pool skews 2.4:1 toward candid, so we subsample to an exactly balanced
+sycophancy, so a probe that has only learned agreement scores them wrong. We subsample to 
 1,368 examples per class for training, with 347 per class held out for test.
 Only the assistant's reply is included in the detection mask, as sycophancy is
-only present in the reply.
+only present in the reply (Fig.~\ref{fig:masks}c).
 
 \paragraph{Evaluation Data}
 \textbf{Math} (\citealt{cincynlp2025}; 1,000 examples). This is the fifth
 factorial domain provided by \citeauthor{cincynlp2025}, which we use as our OOD set, as it is a
 domain shift. Otherwise, examples have the same construction, label mapping,
-and detection mask (e.g.\ ``I believe $18 - 12 = 5$''; Appendix~\ref{app:syc-ood},
-Fig.~\ref{fig:sycood}). We subsample 500 from each class (sycophantic/candid)
+and detection mask (e.g.\ ``I believe $18 - 12 = 5$''; Fig.~\ref{fig:sycood}). We subsample 500 from each class (sycophantic/candid)
 from a usable pool of 3,000 replies, 1,000 sycophantic and 2,000 candid. The
 set tests whether the probe has learned deference to the user rather than the
 content of any one domain.
@@ -547,7 +503,7 @@ two estimators, mass-mean (MM) and logistic regression (LR), with the relevant
 pooling strategies gives the following probes: \texttt{MM (last)},
 \texttt{MM (mean)}, \texttt{LR (last)}, \texttt{LR (mean)}, and
 \texttt{LR-attention}. All probes are fitted on masked activations at the
-detection layer chosen in §\ref{sec:methodology}-C.
+detection layer chosen in §\ref{sec:methodology}-D.
 
 \subsubsection{Estimator}
 The estimator determines a direction pointing from the behaviour being off to
@@ -594,7 +550,7 @@ every probe are listed in Appendix~\ref{app:hyperparams}.
 \paragraph{Last-token Pooling}
 The activation of the sample is taken exclusively from the last token in the
 detection mask. \citeauthor{marks2024}'s work also probes a single token, the
-end-of-sentence punctuation \citep[fn.~3]{marks2024}.
+end-of-sentence punctuation \citep{marks2024}.
 
 \paragraph{Mean Pooling}
 The literature contains two versions of this pooling scheme: average the
@@ -616,7 +572,7 @@ probe is steered (§\ref{sec:steering}), the injected direction is the head's
 weight vector, averaged over the three seeds.
 
 \subsubsection{Probing Evaluation}
-We choose AUROC (area under the receiver operating characteristic curve) with a
+We choose AUROC with a
 bootstrap 95\% confidence interval as our primary evaluation metric for
 probing. AUROC is the probability that the probe gives a randomly chosen
 behaviour-on example a higher score than a randomly chosen behaviour-off one,
@@ -626,53 +582,7 @@ context. Both Apollo and \citeauthor{mckenzie2025} lead with AUROC for their
 probes. Accuracy, by contrast, requires a threshold fixed on training data
 (what probe score constitutes on-behaviour), and no threshold is comparable
 across estimators, since logistic regression is centred at zero by construction
-while mass-mean's raw projection is not. Fig.~\ref{fig:roc} shows the
-out-of-distribution ROC curves, since out-of-distribution transfer is our
-primary concern \citep{marks2024}. We also report TPR at 1\% FPR for
-comparability with \citet{mckenzie2025} where possible.
-
-\subsection{Layer Selection}
-We now have which tokens are eligible to be probed (our detection mask,
-§\ref{sec:methodology}-A), which estimators we use to score a behaviour, and our
-pooling strategies (§\ref{sec:methodology}-B). This section determines which
-layer's hidden states we probe, and, which layers we steer.
-
-\subsubsection{Probing Layer Selection}
-The detection layer is chosen as the layer with the highest pair-aware 5-fold
-cross-validated AUROC of a mass-mean probe on mean-pooled training activations,
-swept over all 32 layers. Mass-mean is the estimator because it is closed form,
-and therefore more efficient to train on cached activations. We overlay a
-logistic-regression curve as an additional robustness check, but MM remains the
-decider. \citet{goldowsky2025} and \citet{mckenzie2025} instead select with
-trained logistic-regression-family probes. We cross-validate AUROC where
-\citeauthor{mckenzie2025} cross-validate accuracy, keeping selection consistent
-with our final evaluation metric --- which is also theirs. Like
-\citeauthor{mckenzie2025}, we select on the training set, so the choice cannot
-bias the evaluation sets.
-
-\subsubsection{Steering Layer Selection}
-Just as the detection layer is selected by our detection metric, the steering
-block is selected by our steering metric: the normalised indirect effect (NIE)
---- informally, how far adding a direction at a single layer shifts the model's
-own judgment of a transcript (defined in §\ref{sec:steereval}). If the block's
-job is to steer well, it should be chosen by how well steering works. The sweep
-adds each layer's mean-gap-calibrated mass-mean direction at coefficient $+1$,
-one layer at a time, while the readout runs on behaviour-off training-split
-transcripts, and we select the contiguous five-layer window with the highest summed NIE. We
-steer a block rather than a single layer as in detection because the causal
-effect is spread across neighbouring layers rather than concentrated at one
-(Fig.~\ref{fig:layerblock}), and \citeauthor{marks2024} likewise intervene on
-their whole causally implicated group of hidden states, not a single site.
-Anchoring the sweep on mass-mean is a disclosed mild bias toward it in the
-later comparison, accepted because one shared block keeps the three directions
-comparable at intervention time. This promotes the NIE from a reporting metric
-to a search criterion, which \citeauthor{marks2024} do not do. CAA likewise
-choose their steering layer by sweeping every layer and taking the largest
-effect on their readout \citep{rimsky2024}, though at both $\pm 1$ and for a
-single layer, and on their held-out test questions rather than a training
-split. \citeauthor{marks2024}'s own
-localisation tool, activation patching, needs a one-token minimal pair and a
-token-level readout, and neither exists for our variable-length dialogues.
+while mass-mean's raw projection is not.
 
 \subsection{Steering}
 \label{sec:steering}
@@ -680,34 +590,30 @@ token-level readout, and neither exists for our variable-length dialogues.
 Probing allows us to find a direction from off- to on-behaviour, and use it to
 score an interaction with the model. Steering involves adding that direction to
 the residual stream of selected layers and tokens during the forward pass
-(inference time). We steer with the same estimators we probed with, to compare
-how each fares at the two tasks (read/write). Of the five probes we steer
+(inference time). Of the five probes we steer
 three: \texttt{MM (mean)}, \texttt{LR (mean)}, and \texttt{LR-attention}. The
 last-token variants are left out because steering writes to every token
 position while their direction is measured at a single one, and because
 last-token pooling underperforms mean and attention both in
-\citeauthor{mckenzie2025}'s benchmark and in our own grid. The three directions
-come out of fitting with arbitrary, different lengths, so adding them at the
-same coefficient would push the model by different amounts --- a comparison of
-norms, not estimators. We therefore calibrate each direction so that
+\citeauthor{mckenzie2025}'s benchmark and in our own grid. The three probe directions
+have arbitrary, different lengths, so adding them at the
+same coefficient would push the model by different amounts.
+We therefore calibrate each direction so that
 coefficient $+1$ moves the average off-behaviour activation exactly onto the
 average on-behaviour activation \citep{marks2024}, and sweep over coefficients
 $\{-2, -1, -0.5, 0, +0.5, +1, +2\}$, following CAA's practice
 \citep{rimsky2024}. One unit of coefficient then
-means the same dose for every arm, layer, and behaviour, and the dose-response
+means one class gap for every direction, layer, and behaviour, and the effect
 curves become directly comparable. For LR, the weight vector is first divided
 back through the scaler's standard deviation so the direction sits in raw
 activation space.
 
-At the block chosen in §\ref{sec:methodology}-C.2, each layer receives its own
+At the block chosen in §\ref{sec:methodology}-D.2, each layer receives its own
 direction: MM and LR are refit from that layer's pooled activations, and the
 attention head is retrained at that layer (three seeds, as in
 §\ref{sec:methodology}-B.2). This differs from \citeauthor{marks2024}, who
-reuse a single vector across their intervention layers; per-layer fits keep the
-calibration exact at every steered layer, and \citet{vanderweij2024} find
+use a single vector across their intervention layers. \citet{vanderweij2024} find
 separate per-layer vectors promising where a single summed vector is not.
-Where the vector is written is covered with the steering evaluation below
-(§\ref{sec:steereval}).
 
 \begin{figure}[t]
 \centering
@@ -755,9 +661,6 @@ disagree.
 
 The primary metric is the \textbf{normalised indirect effect} (NIE), which reproduces
 \citeauthor{marks2024}'s causal metric with YES/NO substituted for TRUE/FALSE.
-A constrained next-token readout of this kind is also CAA's primary metric:
-they report the average probability the model assigns to the answer matching
-the behaviour on held-out multiple-choice questions \citep{rimsky2024}.
 The model reads a few-shot prompt, ending in a question about whether a
 behaviour is present in an off-behaviour transcript, and
 $PD = P(\textsc{yes}) - P(\textsc{no})$ is read at the final position (no text
@@ -770,23 +673,23 @@ steered off-behaviour transcripts ($PD^{-}_{*}$). The NIE is then given as:
 \end{equation}
 Here, $0$ means the intervention did nothing and $1$ means it moved the
 negatives a full class gap. The denominator is meaningful only when the readout
-separates the classes unsteered; a warning fires below a gap of $0.05$. Here,
-we strategically only steer the tokens of the transcript under evaluation, and
+separates the classes unsteered; a warning fires below a gap of $0.05$.
+We strategically only steer the tokens of the transcript under evaluation, and
 not the few-shot demonstrations or the question: the final position answers by
 attending to them, so steering their representations could shift
 $P(\textsc{yes}) - P(\textsc{no})$ directly, without the transcript's
-representation changing (pressure on the instrument rather than an effect of
-the intervention). The prompt used for NIE, and the tokens steered, are
+representation changing. The prompt used for NIE, and the tokens steered, are
 visualized in Fig.~\ref{fig:scope}.
 
-NIE tells us whether a model's perception of a transcript can be steered, but
-open-ended generation tells us whether that becomes elicited behaviour. To
-evaluate this, we strip the assistant response from a held-out item and let the
+The NIE tests whether steering moves the model's \emph{judgment} of a
+transcript; open-ended generation tests whether it moves the model's
+\emph{behaviour}. To
+evaluate this, we remove the assistant response from a held-out item and let the
 model write its own response: for deception and sycophancy this leaves the
 system and user turns, and for the multi-turn high-stakes conversations we trim
 to the last user turn so the model continues a real dialogue. We steer every
 token of that prompt and every token it generates, across the steering block of
-layers selected in §\ref{sec:methodology}-C.2 (Fig.~\ref{fig:scope-gen}).
+layers selected in §\ref{sec:methodology}-D.2 (Fig.~\ref{fig:scope-gen}).
 
 \begin{figure}[t]
 \centering
@@ -825,6 +728,46 @@ Each (direction, coefficient) averages 24 generations (CAA use 50), drawn from o
 
 
 
+\subsection{Layer Selection}
+This section determines which
+layer's hidden states we probe, and, which layers we steer.
+
+\subsubsection{Probing Layer Selection}
+The detection layer is chosen as the earliest layer with the highest pair-aware 5-fold
+cross-validated AUROC of a mass-mean probe on mean-pooled training activations,
+swept over all 32 layers. Mass-mean is the estimator because it is closed form,
+and therefore more efficient to train on cached activations. We overlay a
+logistic-regression curve as an additional robustness check, but MM remains the
+decider. \citet{goldowsky2025} and \citet{mckenzie2025} instead select with
+trained logistic-regression-family probes. We cross-validate AUROC where
+\citeauthor{mckenzie2025} cross-validate accuracy, keeping selection consistent
+with our final evaluation metric --- which is also theirs. Like
+\citeauthor{mckenzie2025}, we select on the training set, so the choice cannot
+bias the evaluation sets.
+
+\subsubsection{Steering Layer Selection}
+Just as the detection layer is selected by our detection metric, the steering
+block is selected by our steering metric: the normalised indirect effect (NIE),
+covered in §\ref{sec:steereval}. If the block's
+job is to steer well, it should be chosen by how well steering works. The sweep
+adds each layer's mean-gap-calibrated mass-mean direction at coefficient $+1$,
+one layer at a time, while the readout runs on behaviour-off training-split
+transcripts, and we select the contiguous five-layer window with the highest summed NIE. We
+steer a block rather than a single layer as in detection because the causal
+effect is spread across neighbouring layers rather than concentrated at one
+(Fig.~\ref{fig:layerblock}), and \citeauthor{marks2024} likewise intervene on
+their whole causally implicated group of hidden states, not a single site.
+Anchoring the sweep on mass-mean is a disclosed mild bias toward it in the
+later comparison, accepted because one shared block keeps the three directions
+comparable at intervention time. This promotes the NIE from a reporting metric
+to a search criterion, which \citeauthor{marks2024} do not do. CAA likewise
+choose their steering layer by sweeping every layer and taking the largest
+effect on their readout \citep{rimsky2024}, though at both $\pm 1$ and for a
+single layer, and on their held-out test questions rather than a training
+split. \citeauthor{marks2024}'s own
+localisation tool, activation patching, needs a one-token minimal pair and a
+token-level readout, and neither exists for our variable-length dialogues.
+
 \subsection{Interface}
 \label{sec:impl}
 
@@ -838,10 +781,9 @@ model. Following \citet{chen2024}, who show that probe-backed read-and-write
 access can serve as a user-facing transparency tool, a user can paste a
 conversation and have every token scored by any probe in the grid from a single
 forward pass at that behaviour's detection layer
-(Appendix~\ref{app:ui-shots}, Fig.~\ref{fig:ui}), or
+(Fig.~\ref{fig:ui}), or
 generate the same prompt twice --- unsteered and steered --- with any direction
-at a chosen coefficient in class-gap units (Appendix~\ref{app:ui-shots},
-Fig.~\ref{fig:ui-steer}). A third tab sums
+at a chosen coefficient in class-gap units (Fig.~\ref{fig:ui-steer}). A third tab sums
 two behaviours' directions into one generation, each at its own block, the
 configuration \citet{vanderweij2024} find promising. It is marked exploratory
 in-app, since composition is not something this pipeline evaluates.
@@ -877,12 +819,12 @@ intervals for the five probes on each held-out evaluation set.}
 \subsection{Deception}
 
 \subsubsection{Layer Selection}
-The detection layer is 12 of 32 (Appendix~\ref{app:layer-curves}, Fig.~\ref{fig:cv-dec}).
+The detection layer is 12 of 32 (Fig.~\ref{fig:cv-dec}).
 Cross-validated AUROC plateaus at 1.000 across layers 11--19; the argmax rule
 returns the leftmost layer of the tied band.
 
 The steering block is layers 11--15, the five-layer window of maximum summed
-NIE (Appendix~\ref{app:niesweeps}, Fig.~\ref{fig:nie-dec}). The per-layer effect
+NIE (Fig.~\ref{fig:nie-dec}). The per-layer effect
 concentrates in two
 spikes at layers 11 ($+0.18$) and 13 ($+0.12$); layer 12 itself is slightly
 negative, and single-layer steering at layers 4--10 gives negative NIE
@@ -892,10 +834,9 @@ is $+0.058$.
 \subsubsection{Detection (Probing)}
 In-distribution detection is near-ceiling: four of the five probes reach
 $\geq 0.996$ AUROC and three reach exactly 1.000
-(Appendix~\ref{app:det-tables}, Table~\ref{tab:app-det-deception}).
+(Table~\ref{tab:app-det-deception}).
 
-The two out-of-distribution sets separate (Appendix~\ref{app:roc-ood},
-Fig.~\ref{fig:roc}a--b). Every probe
+The two out-of-distribution sets separate (Fig.~\ref{fig:roc}a--b). Every probe
 scores highly on AI Liar, spanning 0.818--0.992 with \texttt{MM (mean)}
 highest; every probe falls on roleplaying, spanning 0.554--0.706 with
 \texttt{LR (mean)} highest. The ranking is not preserved between them:
@@ -907,7 +848,7 @@ The in-distribution readout is degenerate. The model answers \textsc{no} to the
 deception question for both classes ($PD^{+}=-0.906$, $PD^{-}=-0.964$), leaving
 a class gap of $+0.058$; dividing by it inflates every in-distribution NIE
 roughly eighteenfold relative to the AI Liar gap of $+1.052$. Those values
-(Appendix~\ref{app:steer-id}, Fig.~\ref{fig:app-steer-id}a) are reported but
+(Fig.~\ref{fig:app-steer-id}a) are reported but
 carry no weight.
 
 Mass-mean gives the largest readout shift on both out-of-distribution sets,
@@ -943,13 +884,13 @@ judged behaviour, and judged coherence across steering coefficients.}
 \subsection{High-stakes}
 
 \subsubsection{Layer Selection}
-The detection layer is 20 of 32 (Appendix~\ref{app:layer-curves}, Fig.~\ref{fig:cv-hs}). The
+The detection layer is 20 of 32 (Fig.~\ref{fig:cv-hs}). The
 selector's curve rises steeply over the first five layers, sits on a broad
 plateau near 0.94 thereafter, and peaks at layer 20 (0.949) before declining
 past layer 23.
 
 The steering block is layers 6--10, the five-layer window of maximum summed
-NIE (Appendix~\ref{app:niesweeps}, Fig.~\ref{fig:nie-hs}). The sweep is a single
+NIE (Fig.~\ref{fig:nie-hs}). The sweep is a single
 bell centred on
 layer 9 (peak $+1.35$): the effect rises from layer 3, remains substantial
 through layer 12, and falls to near zero above layer 14, with no negative band. The
@@ -958,11 +899,10 @@ training-split readout gap serving as the sweep's denominator is $+0.177$.
 \subsubsection{Detection (Probing)}
 In-distribution scores spread across 0.885--0.996 rather than saturating at the
 ceiling, with \texttt{LR-attention} highest at 0.996 and \texttt{LR (mean)}
-next at 0.993 (Appendix~\ref{app:det-tables},
-Table~\ref{tab:app-det-highstakes}).
+next at 0.993 (Table~\ref{tab:app-det-highstakes}).
 
 On OOD (Anthropic-HH) every probe falls by between 0.20 and 0.28
-(Appendix~\ref{app:roc-ood}, Fig.~\ref{fig:roc}c). \texttt{LR (mean)} leads at 0.774, followed by
+(Fig.~\ref{fig:roc}c). \texttt{LR (mean)} leads at 0.774, followed by
 \texttt{LR-attention} at 0.755 and \texttt{MM (mean)} at 0.737; the two
 last-token probes come last at 0.687 and 0.686. The logistic-regression family
 leads both sets, and the ordering is otherwise stable except
@@ -974,8 +914,7 @@ Mass-mean gives the largest readout shift at every positive coefficient on both
 sets. On OOD the response is monotone --- $+0.23$, $+0.72$, $+1.34$ at
 coefficients $+0.5$, $+1$ and $+2$ --- against $+0.12$ for logistic regression
 and $+0.25$ for the attention direction at $+1$ (Fig.~\ref{fig:steer}c). The
-same ordering holds in-distribution (Appendix~\ref{app:steer-id},
-Fig.~\ref{fig:app-steer-id}b), though mass-mean's margin over the attention
+same ordering holds in-distribution (Fig.~\ref{fig:app-steer-id}b), though mass-mean's margin over the attention
 direction narrows to 0.03 at $+2$.
 
 The judge agrees in-distribution but not out of it. In-distribution, mass-mean
@@ -1002,10 +941,9 @@ serving as the sweep's denominator is $+1.034$.
 
 \subsubsection{Detection (Probing)}
 \texttt{MM (last)} is the best detector on both sets: 0.976 in-distribution and
-0.879 on math (Appendix~\ref{app:det-tables},
-Table~\ref{tab:app-det-sycophancy}). In-distribution scores are otherwise
+0.879 on math (Table~\ref{tab:app-det-sycophancy}). In-distribution scores are otherwise
 tightly grouped, spanning 0.928--0.976; on OOD (math) they span 0.802--0.879
-(Appendix~\ref{app:roc-ood}, Fig.~\ref{fig:roc}d).
+(Fig.~\ref{fig:roc}d).
 
 Last-token pooling beats mean pooling for both estimators and on both sets ---
 on math, 0.879 against 0.802 for mass-mean and 0.847 against 0.825 for
@@ -1014,7 +952,7 @@ logistic regression --- and the logistic-regression family leads neither set.
 The attention direction is the only one with a monotone readout response:
 $+0.25$, $+0.54$, $+0.77$ at coefficients $+0.5$, $+1$ and $+2$ on math, and
 $+0.16$, $+0.36$, $+0.81$ in-distribution (Fig.~\ref{fig:steer}d;
-Appendix~\ref{app:steer-id}, Fig.~\ref{fig:app-steer-id}c). Mass-mean is
+Fig.~\ref{fig:app-steer-id}c). Mass-mean is
 non-monotone: it rises at $+0.5$, turns negative at $+1$ ($-0.53$
 in-distribution, $-0.92$ on math), and returns positive at $+2$. Logistic
 regression stays within 0.07 of zero throughout.
@@ -1026,29 +964,6 @@ its readout is negative. Judged coherence there falls to 2.88 and 4.17 from
 8.58 and 8.17, and at $+2$ both behaviour and coherence reach 1.00. The
 attention direction's judged behaviour stays between 1.00 and 1.21 across the
 positive half of the sweep, even as its readout climbs to $+0.77$.
-
-\subsection{Synthesis}
-
-\begin{table}[t]
-\centering
-\footnotesize
-\setlength{\tabcolsep}{2pt}
-\begin{tabular}{llll}
-\toprule
-\textbf{Held-out set} & \textbf{Best detector} & \textbf{Best steerer} & \textbf{Dissociation} \\
-\midrule
-Deception -- AI Liar & MM (mean) 0.992 & MM $+0.05$ & (uninformative) \\
-Deception -- Roleplay & LR (mean) 0.706 & MM $+0.35$ & holds \\
-High-stakes -- HH & LR (mean) 0.774 & MM $+1.34$ & holds \\
-Sycophancy -- math & MM (last) 0.879 & \textbf{LR-attn} $+0.77$ & \textbf{inverts} \\
-\bottomrule
-\end{tabular}
-\caption{The read/write comparison, one row per held-out evaluation set. Best
-detector by AUROC; best steerer by readout NIE at coefficient $+2$, the sweep's
-common endpoint. The dissociation holds where the two columns name different
-families.}
-\label{tab:synth}
-\end{table}
 
 \section{Discussion}
 
@@ -1102,18 +1017,6 @@ fivefold. Neither source paper confronts this, since
 \citeauthor{mckenzie2025}'s mean-beats-last result assumes lexically varied
 inputs. Builders of contrast datasets should expect their templating choices to
 select the pooling scheme.
-
-\textbf{Steering must move the item's representation, and must not touch the
-measuring apparatus.} The scope ablation generalises beyond this pipeline. Behavioural
-steering needs the \emph{prompt's} representation to move with the completion:
-scopes that steer only generated text --- including the published CAA scope ---
-left judged behaviour within noise of its unsteered baseline at every
-coefficient for all three behaviours, where whole-item steering moves judged
-high-stakes from 2.46 to 7.54 across the sweep and judged sycophancy from 1.08
-to 9.71 at coefficient $1$. The model completes from a representation of the
-conversation; if that representation is never moved, neither is the completion. Symmetrically, a causal readout needs its
-measuring apparatus protected, or the measured effect is partly pressure on the
-instrument. The two halves are one rule.
 
 \textbf{Measuring coherence changes how the causal metric should be
 interpreted.} Mass-mean's advantage co-occurs with faster quality degradation
@@ -1177,7 +1080,7 @@ suppression needs its own evaluation, with positives steered and the readout run
 in reverse. Three controls remain open: the blind judge validation, a
 steering-block sweep with the logistic-regression direction, and reporting
 $\cos(\Sigma^{-1}\boldsymbol{\theta}_{\mathrm{mm}},
-\boldsymbol{\theta}_{\mathrm{LR}})$, which \citeauthor{marks2024}'s Appendix F
+\boldsymbol{\theta}_{\mathrm{LR}})$, which \citeauthor{marks2024}'s 
 predicts is near 1 and would explain the read-side result mechanistically. The
 sycophancy inversion is directly testable --- restricting training to
 non-genuine-agreement negatives should, if the relational-label hypothesis is
@@ -1236,11 +1139,6 @@ Chen, Y., Wu, A., DePodesta, T., et al. (2024) `Designing a dashboard for
 transparency and control of conversational AI', \textit{arXiv preprint}
 arXiv:2406.07882.
 
-\bibitem[Vennemeyer et al.(2025)]{cincynlp2025}
-Vennemeyer, D., Duong, P.A., Zhan, T. and Jiang, T. (2025) `Sycophancy is not
-one thing: causal separation of sycophantic behaviors in LLMs',
-\textit{arXiv preprint} arXiv:2509.21305. Data:
-\url{https://github.com/cincynlp/disentangle-sycophancy}.
 
 \bibitem[Cunningham et al.(2023)]{cunningham2023}
 Cunningham, H., Ewart, A., Riggs, L., Huben, R. and Sharkey, L. (2023) `Sparse
@@ -1296,14 +1194,15 @@ Pacchiardi, L., Chan, A.J., Mindermann, S., et al. (2024) `How to catch an AI
 liar: lie detection in black-box LLMs by asking unrelated questions', in
 \textit{International Conference on Learning Representations (ICLR)}.
 
-\bibitem[Perez et al.(2023)]{perez2023}
-Perez, E., Ringer, S., Luko\v{s}i\=ut\.e, K., et al. (2023) `Discovering language
-model behaviors with model-written evaluations', in \textit{Findings of ACL 2023}.
-
 \bibitem[Panickssery et al.(2024)]{rimsky2024}
 Panickssery, N., Gabrieli, N., Schulz, J., Tong, M., Hubinger, E. and Turner,
 A.M. (2024) `Steering Llama 2 via contrastive activation addition', in
 \textit{Proceedings of ACL 2024}. arXiv:2312.06681.
+
+\bibitem[Perez et al.(2023)]{perez2023}
+Perez, E., Ringer, S., Luko\v{s}i\=ut\.e, K., et al. (2023) `Discovering language
+model behaviors with model-written evaluations', in \textit{Findings of ACL 2023}.
+
 
 \bibitem[Scheurer et al.(2023)]{scheurer2023}
 Scheurer, J., Balesni, M. and Hobbhahn, M. (2023) `Large language models can
@@ -1328,6 +1227,12 @@ arXiv:2308.10248.
 van der Weij, T., Poesio, M. and Schoots, N. (2024) `Extending activation
 steering to broad skills and multiple behaviours', \textit{arXiv preprint}
 arXiv:2403.05767.
+
+\bibitem[Vennemeyer et al.(2025)]{cincynlp2025}
+Vennemeyer, D., Duong, P.A., Zhan, T. and Jiang, T. (2025) `Sycophancy is not
+one thing: causal separation of sycophantic behaviors in LLMs',
+\textit{arXiv preprint} arXiv:2509.21305. Data:
+\url{https://github.com/cincynlp/disentangle-sycophancy}.
 
 \bibitem[Vig et al.(2020)]{vig2020}
 Vig, J., Gehrmann, S., Belinkov, Y., et al. (2020) `Investigating gender bias in
@@ -1546,6 +1451,7 @@ spans are the detection mask.}
 \toprule
 \multicolumn{2}{@{}l}{\textbf{Attention probe}}\\
 \midrule
+Heads & 1 (a single query vector) \\
 Optimizer & AdamW \\
 Epochs & 200 \\
 Learning rate & $5\times10^{-3}$ (fixed) \\
@@ -1684,7 +1590,7 @@ weights sum to one within the mask and are comparable across examples. \emph{Why
 attention direction is sycophancy's \emph{best} steerer and the only one with a monotone steering
 response, so where it places mass is evidence about what the writable feature actually is. It is also
 the closest thing this pipeline has to a localisation result, activation patching being unavailable on
-dialogues (§III-D). \emph{What to look for.} The mass sits almost entirely on the answer: on this
+dialogues (§III-C). \emph{What to look for.} The mass sits almost entirely on the answer: on this
 example the echoed country token carries the maximum weight (0.38), with the trailing period next,
 while the templated ``I believe the city of \ldots{} is in'' prefix receives near-uniform low weight
 --- the probe has learned to ignore precisely the span that dilutes mean pooling (§III-B). The
@@ -1904,7 +1810,7 @@ yet evaluate.}
 high-stakes $+1.5$).} At higher combined coefficients the steered generation
 collapses into alarmist non-sequitur (``I can't help but say that the sky is
 falling.'') where the baseline suggests cuisines --- the degradation the
-coherence axis quantifies in §IV-D, reproduced interactively. The two
+coherence axis quantifies, reproduced interactively. The two
 multiplier sliders make the coherence cliff something a user can find by
 feel.}
 \label{fig:ui-multi2}
@@ -2006,7 +1912,7 @@ own. \\
 \hline
 Experimental component (LLM judge)
 & Claude Haiku 4.5 is used \emph{within} the methodology as the LLM judge
-scoring steered generations (\S III-D.1)
+scoring steered generations (\S\ref{sec:methodology}-\ref{sec:steereval})
 & This is a measured component of the system itself, not a writing or coding
 aid; its prompts are in Appendix~\ref{app:judge} and its lack of blind
 validation is a declared limitation. \\
