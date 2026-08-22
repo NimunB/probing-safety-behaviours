@@ -47,6 +47,15 @@
 \usetikzlibrary{positioning,arrows.meta,fit,backgrounds}
 \usepackage[hidelinks]{hyperref}
 
+% Tighten the title area: less space between title and author block (default
+% adjustment -0.25em on top of a hardcoded 1em), and less below the author block
+% before the text starts (defaults 2.5/2 baselineskips; MIN is the binding floor).
+\makeatletter
+\def\@IEEEauthorblockconfadjspace{-0.75em}
+\def\@IEEENORMtitlevspace{0.75\baselineskip}
+\def\@IEEEMINtitlevspace{0.5\baselineskip}
+\makeatother
+
 % IEEEtran sets table captions ABOVE the table, centred, in small caps. Match the
 % FIGURE caption style instead: below the table, normal font and case, "Table N. text".
 \makeatletter
@@ -144,7 +153,7 @@
 
 \begin{document}
 
-\title{Probing and Steering for Safety-Relevant Behaviours in LLMs}
+\title{\fontsize{23.5}{28.2}\selectfont Probing and Steering for Safety-Relevant Behaviours\\ in Large Language Models}
 
 \author{\IEEEauthorblockN{Nimun Kaur Bajwa (250828810)}
 \IEEEauthorblockA{Supervisor: Massimo Poesio\\
