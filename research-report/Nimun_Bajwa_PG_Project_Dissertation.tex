@@ -30,6 +30,12 @@
 %  Build:  latexmk -pdf report_v5.tex
 %=======================================================================
 \documentclass[conference]{IEEEtran}
+% Layout: reclaim ~1 cm of bottom margin. IEEEtran quantises \textheight to whole
+% lines, so add a whole number of 12pt baselines: 3 lines = 36pt = 1.27 cm.
+\addtolength{\textheight}{36pt}
+% Balance top/bottom margins on every page after the first: shift the text block
+% up 1.8 mm at shipout (page 1 keeps the default so the title area is unchanged).
+\AddToHook{shipout/before}{\ifnum\value{page}>1 \global\voffset=-1.8mm\fi}
 \IEEEoverridecommandlockouts
 
 \usepackage[authoryear,round]{natbib}
@@ -1888,11 +1894,13 @@ train-split transcripts while every reported curve uses held-out ones.
 \texttt{exported\_probes/} by \texttt{make\_appendix\_tables.py}, so re-running the pipeline and
 re-running that script is sufficient to bring them back into agreement with the artefacts.
 
+
 % The remaining appendices are figure-dominated; single-column layout lets each
 % figure take its natural width and keeps headings, figures and captions together.
 % \raggedbottom stops \flushbottom stretching short pages into sparse ones.
 \onecolumn
 \raggedbottom
+
 
 \section{Generative AI Declaration}
 \label{app:genai}
