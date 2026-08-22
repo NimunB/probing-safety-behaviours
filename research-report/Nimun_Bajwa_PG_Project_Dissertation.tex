@@ -500,9 +500,9 @@ content of any one domain.
 
 We define a probe as an estimator crossed with a pooling strategy. Crossing our
 two estimators, mass-mean (MM) and logistic regression (LR), with the relevant
-pooling strategies gives the following probes: \texttt{MM (last)},
-\texttt{MM (mean)}, \texttt{LR (last)}, \texttt{LR (mean)}, and
-\texttt{LR-attention}. All probes are fitted on masked activations at the
+pooling strategies gives the following probes: MM (last),
+MM (mean), LR (last), LR (mean), and
+LR-attention. All probes are fitted on masked activations at the
 detection layer chosen in §\ref{sec:methodology}-D.
 
 \subsubsection{Estimator}
@@ -589,9 +589,9 @@ while mass-mean's raw projection is not.
 
 Probing allows us to find a direction from off- to on-behaviour, and use it to
 score an interaction with the model. Steering involves adding that direction to
-the residual stream of selected layers and tokens during the forward pass
-(inference time). Of the five probes we steer
-three: \texttt{MM (mean)}, \texttt{LR (mean)}, and \texttt{LR-attention}. The
+the residual stream of selected layers and tokens during the forward pass.
+Of the five probes we steer
+three: MM (mean), LR (mean), and LR-attention. The
 last-token variants are left out because steering writes to every token
 position while their direction is measured at a single one, and because
 last-token pooling underperforms mean and attention both in
@@ -717,20 +717,15 @@ An \textbf{LLM judge} (Claude Haiku 4.5) then scores each generation 1--10 on ho
 strongly the assistant response exhibits the target behaviour, following
 \citeauthor{rimsky2024}'s scoring instruction, and separately on coherence
 (prompts are shown in Appendix~\ref{app:judge}).
-\citeauthor{rimsky2024} found that larger multipliers degrade text quality ---
-a behaviour score that rises while coherence collapses is steering that breaks
-the model rather than steering it, and we wanted to quantify this effect as
-well.
 
-Each (direction, coefficient) averages 24 generations (CAA use 50), drawn from off-behaviour prompts, where nothing in the setup incites the behaviour, so any rise can be attributed to the steering.
-
+Each (direction, coefficient) averages the scores from 24 generations (CAA use 50), drawn from off-behaviour prompts.
 
 
 
 
 \subsection{Layer Selection}
 This section determines which
-layer's hidden states we probe, and, which layers we steer.
+layer's hidden states we probe, and which layers we steer.
 
 \subsubsection{Probing Layer Selection}
 The detection layer is chosen as the earliest layer with the highest pair-aware 5-fold
@@ -748,45 +743,39 @@ bias the evaluation sets.
 \subsubsection{Steering Layer Selection}
 Just as the detection layer is selected by our detection metric, the steering
 block is selected by our steering metric: the normalised indirect effect (NIE),
-covered in §\ref{sec:steereval}. If the block's
-job is to steer well, it should be chosen by how well steering works. The sweep
-adds each layer's mean-gap-calibrated mass-mean direction at coefficient $+1$,
-one layer at a time, while the readout runs on behaviour-off training-split
+covered in §\ref{sec:steereval}. The sweep
+adds each layer's mean-gap-calibrated, mean-pooled mass-mean direction at
+coefficient $+1$.
+The readout runs on behaviour-off training-split
 transcripts, and we select the contiguous five-layer window with the highest summed NIE. We
-steer a block rather than a single layer as in detection because the causal
+steer a block rather than a single layer like in detection because the causal
 effect is spread across neighbouring layers rather than concentrated at one
 (Fig.~\ref{fig:layerblock}), and \citeauthor{marks2024} likewise intervene on
 their whole causally implicated group of hidden states, not a single site.
 Anchoring the sweep on mass-mean is a disclosed mild bias toward it in the
 later comparison, accepted because one shared block keeps the three directions
-comparable at intervention time. This promotes the NIE from a reporting metric
-to a search criterion, which \citeauthor{marks2024} do not do. CAA likewise
+comparable at intervention time. CAA likewise
 choose their steering layer by sweeping every layer and taking the largest
 effect on their readout \citep{rimsky2024}, though at both $\pm 1$ and for a
-single layer, and on their held-out test questions rather than a training
-split. \citeauthor{marks2024}'s own
-localisation tool, activation patching, needs a one-token minimal pair and a
-token-level readout, and neither exists for our variable-length dialogues.
+single layer.
 
 \subsection{Interface}
 \label{sec:impl}
 
 Each behaviour exports a $\sim$0.5\,MB bundle: the five fitted probes at its
-detection layer (\texttt{MM (last)}, \texttt{MM (mean)}, \texttt{LR (last)},
-\texttt{LR (mean)}, \texttt{LR-attention}), the calibrated directions
-(\texttt{MM (mean)}, \texttt{LR (mean)}, \texttt{LR-attention}) at each layer
-of its steering block, and both layer choices. These saved artefacts, rather
-than any stored activations, drive an interactive interface over the live
-model. Following \citet{chen2024}, who show that probe-backed read-and-write
-access can serve as a user-facing transparency tool, a user can paste a
+detection layer (MM (last), MM (mean), LR (last),
+LR (mean), LR-attention), the calibrated directions
+(MM (mean), LR (mean), LR-attention) at each layer
+of its steering block, and the layer choices. These saved artefacts drive an interactive
+interface over the live model. Following \citet{chen2024}, who show that probe-backed 
+read-and-write access can serve as a user-facing transparency tool, a user can paste a
 conversation and have every token scored by any probe in the grid from a single
 forward pass at that behaviour's detection layer
 (Fig.~\ref{fig:ui}), or
 generate the same prompt twice --- unsteered and steered --- with any direction
 at a chosen coefficient in class-gap units (Fig.~\ref{fig:ui-steer}). A third tab sums
 two behaviours' directions into one generation, each at its own block, the
-configuration \citet{vanderweij2024} find promising. It is marked exploratory
-in-app, since composition is not something this pipeline evaluates.
+configuration \citet{vanderweij2024} find promising.
 
 \section{Results}
 \label{sec:results}
@@ -819,29 +808,37 @@ intervals for the five probes on each held-out evaluation set.}
 \subsection{Deception}
 
 \subsubsection{Layer Selection}
-The detection layer is 12 of 32 (Fig.~\ref{fig:cv-dec}).
-Cross-validated AUROC plateaus at 1.000 across layers 11--19; the argmax rule
-returns the leftmost layer of the tied band.
+The detection layer is chosen to be layer 12 of the 32 in Llama-3.1-8B
+(Fig.~\ref{fig:cv-dec}). The cross-validated AUROC is near ceiling
+($\geq 0.996$) from layers 11 to 20, with layers 12 and 13 exactly at 1.000.
+At 37.5\% depth, layer 12 is early-to-mid --- consistent with
+\citeauthor{marks2024}'s finding that linear structure for truth emerges in
+the early-middle layers, and comparable to Apollo's deception layer at 22 of
+80 (27.5\%) on Llama-3.3-70B.
 
-The steering block is layers 11--15, the five-layer window of maximum summed
-NIE (Fig.~\ref{fig:nie-dec}). The per-layer effect
-concentrates in two
-spikes at layers 11 ($+0.18$) and 13 ($+0.12$); layer 12 itself is slightly
-negative, and single-layer steering at layers 4--10 gives negative NIE
-throughout. The training-split readout gap serving as the sweep's denominator
-is $+0.058$.
+The steering block consists of layers 11--15. The detection layer
+falls inside this block, toward its lower end.
 
-\subsubsection{Detection (Probing)}
-In-distribution detection is near-ceiling: four of the five probes reach
-$\geq 0.996$ AUROC and three reach exactly 1.000
-(Table~\ref{tab:app-det-deception}).
+\subsubsection{Detection}
+In distribution, detection is at or near ceiling: three of the five probes
+reach an AUROC of 1.000, with LR (last) at 0.996 and MM (last) at 0.948
+(Fig.~\ref{fig:detid}). Out of distribution, pooling both held-out sets,
+LR (mean) leads at 0.722, ahead of MM (last) at 0.696; LR (last) trails at
+0.571 (Appendix~\ref{app:det-tables}).
 
-The two out-of-distribution sets separate (Fig.~\ref{fig:roc}a--b). Every probe
-scores highly on AI Liar, spanning 0.818--0.992 with \texttt{MM (mean)}
-highest; every probe falls on roleplaying, spanning 0.554--0.706 with
-\texttt{LR (mean)} highest. The ranking is not preserved between them:
-\texttt{MM (mean)} is first on AI Liar and fourth on roleplaying. On the two
-sets pooled, \texttt{LR (mean)} leads at 0.722.
+The two held-out sets separate sharply (Fig.~\ref{fig:detood}). On AI Liar,
+every probe except LR (last) scores above 0.95 (best: MM (mean) at 0.992).
+On Roleplaying, the highest is LR (mean)'s 0.706. This discrepancy could be
+explained by AI Liar's deception being \emph{context-defined}, like our
+training dataset (Instructed-Pairs): the system prompt differentiates honest
+and deceptive samples, but the assistant answers are byte-identical. In
+Roleplaying, deception is \emph{content-defined}, and it is therefore further from
+the training distribution.
+
+On Llama-3.3-70B, Apollo's logistic-regression probe holds 0.964 on
+Roleplaying, where we fall to 0.706. Scale is a plausible explanation:
+\citeauthor{marks2024} find that linear structure for truth emerges more
+clearly as models grow.
 
 \subsubsection{Steering}
 The in-distribution readout is degenerate. The model answers \textsc{no} to the
@@ -884,30 +881,44 @@ judged behaviour, and judged coherence across steering coefficients.}
 \subsection{High-stakes}
 
 \subsubsection{Layer Selection}
-The detection layer is 20 of 32 (Fig.~\ref{fig:cv-hs}). The
-selector's curve rises steeply over the first five layers, sits on a broad
-plateau near 0.94 thereafter, and peaks at layer 20 (0.949) before declining
-past layer 23.
+The detection layer is 20 of 32 (Fig.~\ref{fig:cv-hs}), with a
+cross-validated AUROC of 0.949 --- 62.5\% depth, later than deception's
+37.5\%. The later layer could be explained by the complexity of what is
+probed: high-stakes training samples (Models Under Pressure) are user
+prompts describing an entire situation, not one-off statements like
+deception and sycophancy --- a median of 58 probed tokens, against six for
+deception. \citeauthor{marks2024} observe that linear structure emerges
+later for more structurally complex statements.
 
-The steering block is layers 6--10, the five-layer window of maximum summed
-NIE (Fig.~\ref{fig:nie-hs}). The sweep is a single
-bell centred on
-layer 9 (peak $+1.35$): the effect rises from layer 3, remains substantial
-through layer 12, and falls to near zero above layer 14, with no negative band. The
-training-split readout gap serving as the sweep's denominator is $+0.177$.
+\citeauthor{mckenzie2025} selected layer 31 of 80 on their 70B model
+(38.75\% depth), using cross-validated \emph{accuracy} of a mean-pooled
+logistic probe on the same training data, where we use AUROC of MM (mean).
+Potentially the larger model develops its internal understanding of the
+situation earlier: \citeauthor{marks2024} find that linear representations
+of truth strengthen with scale.
 
-\subsubsection{Detection (Probing)}
-In-distribution scores spread across 0.885--0.996 rather than saturating at the
-ceiling, with \texttt{LR-attention} highest at 0.996 and \texttt{LR (mean)}
-next at 0.993 (Table~\ref{tab:app-det-highstakes}).
+The steering block is layers 6--10 (Fig.~\ref{fig:nie-hs}). Interestingly,
+the detection layer sits ten layers above the steering block.
 
-On OOD (Anthropic-HH) every probe falls by between 0.20 and 0.28
-(Fig.~\ref{fig:roc}c). \texttt{LR (mean)} leads at 0.774, followed by
-\texttt{LR-attention} at 0.755 and \texttt{MM (mean)} at 0.737; the two
-last-token probes come last at 0.687 and 0.686. The logistic-regression family
-leads both sets, and the ordering is otherwise stable except
-\texttt{LR (last)}, which falls from third in-distribution to last.
+\subsubsection{Detection}
+In distribution, detection is high but does not saturate like deception:
+scores spread across 0.885--0.996, with LR-attention highest at 0.996 and
+LR (mean) next at 0.993 (Fig.~\ref{fig:detid}). The training data (Models
+Under Pressure) could be too complex for the probes to fully separate.
 
+On OOD (Anthropic-HH), every probe falls by 0.20--0.28
+(Fig.~\ref{fig:detood}). LR (mean) leads at 0.774, followed by LR-attention
+at 0.755 and MM (mean) at 0.737 --- the three probes that consider every
+token; the two last-token probes come last at 0.687 and 0.686. This matches
+\citeauthor{mckenzie2025}, whose strongest probes (Attention, Softmax,
+Mean) all take every token into account --- labelling an interaction as
+high-stakes ``often depends on every token of the conversation to provide
+the necessary context'' --- and whose last-token probe ``consistently
+performs poorly''.
+
+On their 70B model, \citeauthor{mckenzie2025}'s attention probe reaches
+approximately 0.96 on Anthropic-HH, where ours reaches 0.755 ---
+potentially a scale effect again.
 
 \subsubsection{Steering}
 Mass-mean gives the largest readout shift at every positive coefficient on both
@@ -928,26 +939,39 @@ directions never reduce coherence by more than 0.25 on either set.
 \subsection{Sycophancy}
 
 \subsubsection{Layer Selection}
-The detection layer is 19 of 32 (Fig.~\ref{fig:layers}). The MM's curve
-climbs gradually from AUROC 0.77 at layer 0 to 0.85 by layer 15, rises sharply over
-layers 16--18 (0.87, 0.90, 0.94) to its peak at 19 (0.940), then declines
-slowly to 0.89 at layer 31.
+The detection layer is 19 of 32 (Fig.~\ref{fig:layers}), with a
+cross-validated AUROC of 0.940 --- 59.4\% depth, deep like high-stakes
+despite the training samples being one-off statements again. A possible
+reason is that the label is relational, not lexical: 29\% of the training
+negatives are genuine agreements, so the probe cannot read agreement alone
+--- it must combine the reply's stance with the truth of the user's claim.
+\citeauthor{cincynlp2025} likewise find that sycophantic and genuine
+agreement only separate representationally around mid-network depth.
 
-The steering block is layers 6--10, the five-layer window of maximum summed
-NIE (Fig.~\ref{fig:layerblock}). The NIE rises above zero across layers
-4--14 and is highest at the block's first layer (6, $+0.15$); above layer 16
-it is flat, every layer within 0.01 of zero. The training-split readout gap
-serving as the sweep's denominator is $+1.034$.
+The steering block is layers 6--10 (Fig.~\ref{fig:layerblock}). Like
+high-stakes, the detection layer sits well above the steering block ---
+nine layers in this case.
 
-\subsubsection{Detection (Probing)}
-\texttt{MM (last)} is the best detector on both sets: 0.976 in-distribution and
-0.879 on math (Table~\ref{tab:app-det-sycophancy}). In-distribution scores are otherwise
-tightly grouped, spanning 0.928--0.976; on OOD (math) they span 0.802--0.879
-(Fig.~\ref{fig:roc}d).
+\subsubsection{Detection}
+Last-token pooling leads for once. In distribution, the top three are
+MM (last) at 0.976, LR (last) at 0.975 and LR-attention at 0.974 ---
+near-tied (Fig.~\ref{fig:detid}) --- and the same three lead on OOD (math),
+with MM (last) best at 0.879 (Fig.~\ref{fig:detood}). The two mean-pooled
+probes come last on both sets, despite being quite strong for the
+other two behaviours.
 
-Last-token pooling beats mean pooling for both estimators and on both sets ---
-on math, 0.879 against 0.802 for mass-mean and 0.847 against 0.825 for
-logistic regression --- and the logistic-regression family leads neither set.
+This inversion follows from the data construction: assistant replies share a
+templated prefix, and the difference between a sycophantic and a candid
+reply is concentrated at the end --- usually the final content word, which
+either echoes the user's belief or contradicts it (Fig.~\ref{fig:masks}c).
+Mean pooling dilutes that signal over the shared template. LR-attention
+stays competitive because it can learn where to look: in the example of
+Fig.~\ref{fig:app-attn}, it puts 0.38 of its pooling mass on the echoed
+answer token. Our last token is the reply's closing punctuation, one
+position after the answer word --- the site \citeauthor{marks2024} probe,
+noting that the final word's own representation can be dominated by the
+token's identity.
+
 \subsubsection{Steering}
 The attention direction is the only one with a monotone readout response:
 $+0.25$, $+0.54$, $+0.77$ at coefficients $+0.5$, $+1$ and $+2$ on math, and
@@ -1004,8 +1028,8 @@ predict which behaviours dissociate: high-stakes and sycophancy share it, and
 only sycophancy inverts.
 
 \textbf{The choice of token pooling can matter more than the choice of
-estimator, and it interacts with dataset design.} On the math set \texttt{last}
-beats \texttt{mean} inside both families (0.879 against 0.802 for mass-mean,
+estimator, and it interacts with dataset design.} On the math set \emph{last}
+beats \emph{mean} inside both families (0.879 against 0.802 for mass-mean,
 0.847 against 0.825 for logistic regression), while high-stakes obeys the
 source papers' ordering (mean 0.774, last 0.686) --- an inversion larger than
 several estimator differences, and it follows from a dataset design
@@ -1488,8 +1512,9 @@ stopping; optimizer, epochs and starting learning rate coincide.}
 
 The body shows one behaviour per diagnostic to stay within the page limit. This appendix and the
 following ones supply the other behaviours, read side then write side, so a reader checking whether a
-claim generalises does not have to take it on trust. Pair-aware 5-fold CV AUROC against layer,
-mass-mean as selector with a logistic-regression overlay as a robustness check, chosen layer marked;
+claim generalises does not have to take it on trust. Pair-aware 5-fold CV AUROC on mean-pooled
+training activations against layer, mass-mean as selector with a
+logistic-regression overlay as a robustness check, chosen layer marked;
 sycophancy is Fig.~\ref{fig:layers} in the body.
 
 \begin{figure}[H]
