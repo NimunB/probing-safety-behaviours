@@ -1,0 +1,99 @@
+% DRAFT — Discussion replacement for review. Not \input anywhere; pick at it here,
+% then paste over \section{Discussion} ... up to \subsection{Limitations} in the main file.
+% Headings kept; content rewritten from the notes (probing first, then steering).
+
+\section{Discussion}
+
+\textbf{The read/write dissociation holds for two behaviours and inverts for
+the third.} For deception and high-stakes, logistic regression (LR (mean))
+detects best out of distribution and the mass-mean direction (MM (mean))
+steers best by the readout, reproducing the pattern \citeauthor{marks2024}
+report for truth. On the reading
+side, they find that mass-mean underperforms logistic
+regression on 7B models and only matches it at larger scale, so a
+logistic-regression win at 8B is what their result predicts. On the
+writing side, they and ITI \citep{li2023} find that
+the mass-mean direction steers better than the logistic-regression one.
+Sycophancy inverts the dissociation: MM (last) detects best, and the
+attention direction, from the logistic-regression family, steers best.
+While this might indicate that the dissociation depends on the behaviour,
+the pooling paragraph below offers an alternative partial explanation for the steering inversion [check].
+
+\textbf{The best pooling strategy depends on the behaviour and the data.}
+Whether an interaction is high stakes [todo] ]whole situation --- [todo] --- so the
+evidence is spread across the text rather than concentrated in one token, both in our ID (one long user turn describing a situation) and OOD (multi turn between user)
+and the every-token probes win, as \citeauthor{mckenzie2025}
+also find. For our sycophancy data, the difference between a sycophantic and a
+candid reply usually sits at the end [todo: why], so the last-token probes win. The
+same fact can explain the steering inversion we discussed in the above paragraph (lr family probe - attention steers the best). Of the three directions
+steered (we only use means for teering), mass-mean and logistic regression are refit on mean-pooled
+activations and only the attention direction is fit on a pooling that
+concentrates on the final answer token, so it alone carries the feature
+the last-token probes detected. (and what does this mean? reference my draft.)
+
+
+\textbf{In-distribution detection is higher than out-of-distribution
+detection, and how closely the held-out data matches the training data
+decides by how much.} Deception saturates in distribution, and high-stakes
+and sycophancy also fall on their held-out sets. \citeauthor{marks2024}
+warn that probes may identify ``not truth, but other features that
+correlate with truth on their training data'', and the pattern of drops
+here fits that warning. AI Liar is context-defined like Instructed-Pairs,
+with byte-identical probed answers, and every probe stays high;
+Roleplaying is content-defined and every probe falls. Math keeps the
+factorial template of the sycophancy training domains and loses little;
+Anthropic-HH changes both format and content and loses more. The closeness
+of the held-out set shows in steering too: sycophancy's out-of-distribution
+readout and judge curves have almost the same shape as its in-distribution
+ones. Our probes also score below the reference papers on the shared sets
+--- Apollo reach 0.964 on Roleplaying where we reach 0.706, and
+\citeauthor{mckenzie2025}'s attention probe roughly 0.96 on Anthropic-HH
+where ours reaches 0.755. Scale is the likely reason. \citeauthor{marks2024}
+present evidence that ``linear representations of truth emerge with scale,
+with larger models having a more abstract notion of truth'', and
+\citeauthor{mckenzie2025} measure it directly: the same probe scores 0.887,
+0.913 and 0.916 on 8B, 27B and 70B models, ``only modest performance
+degradation on smaller models''. The comparisons are not exact, as Apollo
+evaluate on-policy generations with several completions per prompt.
+
+\textbf{The two instruments measure different things.} The readout
+ordering MM $>$ attention $>$ LR holds on both in-distribution and
+held-out sets for deception and high-stakes, but judged behaviour is
+nearly flat almost everywhere, and the two can disagree outright: on
+sycophancy at coefficient $+1$ the readout falls while the judge scores
+the generations as maximally sycophantic. One instrument measures the
+model's perception of a transcript, the other what it elicits, and the two
+sometimes move independently or in opposite directions. The metric to
+report therefore depends on the task: a monitor cares about perception, an
+intervention about elicited behaviour. Coherence has a consistent shape
+across sets --- highest near the centre of the sweep and degrading toward
+the extremes, clearest on Roleplaying and sycophancy, with AI Liar peaking
+at $+1$ --- matching \citeauthor{rimsky2024}'s finding that large
+multipliers degrade text quality.
+
+\textbf{Negative coefficients do not mirror positive ones.} Our directions
+are trained from behaviour-off to behaviour-on, and every steered item is
+already behaviour-off, so a negative coefficient asks the model to be less
+of something it is not. There is no consistent way to unsteer in these
+results: the negative side is flat near zero on Anthropic-HH, negative in
+distribution, and U-shaped on Roleplaying, where mass-mean and logistic
+regression rise again at $-2$. One possibility is that a model pushed hard
+away from deception produces text that reads as deceptive, as trying too
+hard not to lie can look like lying; we do not test this.
+\citeauthor{marks2024} measure suppression separately, steering
+behaviour-on items toward off, which these results cannot speak to.
+
+\textbf{The layer that writes a behaviour best sits below the layer that
+reads it best.} \citet{alain2018} found that linear separability increases
+monotonically with depth. Ours is not monotonic --- each detection curve
+rises through the early layers, crests in the middle of the network, and
+declines --- but the build-up is visible for every behaviour. The causal
+blocks lie within layers 6--15 for all three behaviours while detection
+peaks at layers 12, 20 and 19; they coincide only for deception. A natural
+reading is that the behaviour is \emph{computed} early, where intervening
+still changes downstream processing, and becomes \emph{legible} later,
+when intervening is too late to matter. CAA's optimal layer (13 of 32) and
+\citeauthor{marks2024}'s causally localised group sit in the same
+early-middle band. The offset does not predict which behaviours
+dissociate: high-stakes and sycophancy share it, and only sycophancy
+inverts.

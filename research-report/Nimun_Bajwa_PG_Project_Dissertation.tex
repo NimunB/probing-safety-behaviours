@@ -842,8 +842,9 @@ clearly as models grow.
 In distribution, mass-mean gives the expected monotone response: the
 largest readout shift toward the behaviour at positive coefficients
 ($+1.53$ at $+2$) and the largest shift away at negative ones ($-0.23$ at
-$-2$), with attention following more weakly and logistic regression flat
-on the positive side (Fig.~\ref{fig:app-steer-id}a).
+$-2$), with attention following more weakly and logistic regression barely
+moving on the positive side ($+0.13$ at $+2$) while running the wrong way
+on the negative side ($+0.37$ at $-2$) (Fig.~\ref{fig:app-steer-id}a).
 
 That ordering --- MM $>$ attention $>$ LR --- holds on both held-out sets.
 On AI Liar, mass-mean rises almost monotonically from $-0.064$ at $-2$ to
@@ -1807,9 +1808,10 @@ soften the truth to please the user.}
 \caption{\textbf{Steering, in-distribution.} Panels as Fig.~\ref{fig:steer}: readout NIE, judge
 behaviour, judge coherence. \emph{Why in the appendix rather than the body.} Two independent reasons.
 Steering blocks were selected to maximise NIE on training transcripts, so these values are closer to
-fitted than held-out. And deception's in-distribution readout is degenerate: the model answers ``NO''
-to the deception question for \emph{both} classes ($PD^{+}=-0.906$, $PD^{-}=-0.964$), leaving a class
-gap of $0.058$, so its NIE should not be quoted. Its judge columns are empty for a separate reason,
+fitted than held-out. And deception's in-distribution readout gap is small: the fact is true under both personas, so the
+model answers ``NO'' to the deception question for \emph{both} classes ($PD^{+}=-0.906$,
+$PD^{-}=-0.964$), leaving a class gap of $0.058$ and NIE magnitudes that are not comparable with the
+held-out sets. Its judge columns are empty for a separate reason,
 the in-distribution generation prompts are byte-identical under greedy decoding, so the judge would
 score one generation repeatedly. \emph{What to look for.} Whether the direction \emph{ordering}
 matches the out-of-distribution panels; the magnitudes here should not be compared with them.}
