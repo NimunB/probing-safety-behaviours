@@ -1010,118 +1010,119 @@ logistic regression's stays flat near $8$ on both.
 \section{Discussion}
 
 \textbf{The read/write dissociation holds for two behaviours and inverts for
-the third.} For deception and high-stakes, logistic regression (LR (mean))
-detects best out of distribution and the mass-mean direction (MM (mean))
-steers best by the readout, reproducing the pattern \citeauthor{marks2024}
-report for truth. On the reading side, they find that mass-mean
-underperforms logistic regression on 7B models and only matches it at
-larger scale, so a logistic-regression win at 8B is what their result
-predicts. On the writing side, they and ITI \citep{li2023} find that the
-mass-mean direction steers better than the logistic-regression one.
-Sycophancy inverts the dissociation: MM (last) detects best, and the
-attention direction, from the logistic-regression family, steers best.
-This might indicate that the dissociation depends on the behaviour; the
+the third.} For deception and high-stakes, logistic regression (LR (mean)) detects best out of
+distribution andthe mass-mean direction (MM (mean)) steers best by the readout, reproducing the
+pattern \citeauthor{marks2024} report. Their reading result
+predicts ours: mass-mean underperforms logistic regression on 7B models
+and only matches it at larger scale. Their writing result, shared with ITI
+\citep{li2023}, is that the mass-mean direction steers better. Sycophancy
+inverts this: MM (last) detects best and LR-attention steers best. This
+might indicate that the dissociation depends on the behaviour, but the
 pooling paragraph below suggests it depends on the data instead.
 
 \textbf{The best pooling strategy depends on the behaviour and the data.}
 Whether an interaction is high-stakes depends on the whole situation, so
-the evidence is spread across the text rather than concentrated in one
-token. This holds both in distribution, where each item is one long user
-turn describing a situation, and out of distribution, where Anthropic-HH
-is a multi-turn dialogue between user and assistant; on both, the
-every-token probes win, as \citeauthor{mckenzie2025} also find. For our
-sycophancy data the opposite holds: the replies follow a template that
-repeats the user's claim and differs only in the final answer, so the
-difference between a sycophantic and a candid reply sits at the end, and
-the last-token probes win. This data difference might also explain why,
-for sycophancy alone, an LR-family (LR-attention) direction steers better than
-mass-mean. Each steering direction is fit on pooled replies. Because the
-replies share almost every token, mean pooling averages the one token that
-differs with the many that do not, and the mass-mean and
-logistic-regression directions, which both fit on mean-pooled activations, are
-diluted as a result. The attention probe learned to weight the answer
-token heavily (Fig.~\ref{fig:app-attn}), so its direction was fit where the
-two classes actually differ. The mass-mean probe that won detection was fit
-on the last token too, but was never steered. The inversion may therefore be a consequence of the data and the pooling it favours, rather than of the estimators.
+the evidence is spread across the text and the every-token probes win on
+both sets, as \citeauthor{mckenzie2025} also find. Our sycophancy replies
+follow a template that differs only in the final answer, so the
+difference sits at the end and the last-token probes win. This data
+difference might also explain why, for sycophancy alone, LR-attention
+steers better than mass-mean. Each steering direction is fit on pooled
+replies, and mean pooling averages the one token that differs with the
+many that do not, so the mass-mean and logistic-regression directions are
+diluted, whereas the attention probe learned to prioritize the answer token
+(Fig.~\ref{fig:app-attn}) and its direction was fit where the classes
+differ. The mass-mean probe that won detection was fit on the last token
+but was never steered, so the inversion may be a consequence of the data
+and the pooling it favours rather than of the estimators.
 
-\textbf{The layer that writes a behaviour best can sit well below the layer
-that reads it best.} For high-stakes and sycophancy the causal band (6--10 in
-both) sits ten or more layers below the detection layer (20 and 19); the
-high-stakes curves make the shape explicit --- detection is a plateau spanning
-most of the network (logistic regression above 0.98 from layer 5 to past 20),
-causal effect a narrow early bump (peak 1.35 at layer 9, near zero above 14). A
-natural reading is that the behaviour is \emph{computed} early, where
-intervening still changes downstream processing, and becomes \emph{legible}
-later, when intervening is too late to matter. The offset does not, however,
-predict which behaviours dissociate: high-stakes and sycophancy share it, and
-only sycophancy inverts.
+\textbf{The detection layer moves later as the behaviour becomes more
+complex.} Deception is read best at layer 12, sycophancy at 19 and
+high-stakes at 20, and the order follows what the probe has to learn: a
+single contrast in the persona for deception, the reply's stance combined
+with the truth of the claim for sycophancy, and an entire situation for
+high-stakes. \citeauthor{marks2024} observe that linear structure emerges
+``later for datasets of more structurally complex statements'', and the
+ordering here is indicative of that pattern.
 
-\textbf{The choice of token pooling can matter more than the choice of
-estimator, and it interacts with dataset design.} On the math set \emph{last}
-beats \emph{mean} inside both families (0.879 against 0.802 for mass-mean,
-0.847 against 0.825 for logistic regression), while high-stakes obeys the
-source papers' ordering (mean 0.774, last 0.686) --- an inversion larger than
-several estimator differences, and it follows from a dataset design
-choice: factorial templates holding everything but the answer fixed. The
-attention probe's weights show the mechanism --- 0.38 of its pooling mass lands
-on the single echoed token, against at most 0.03 on any high-stakes token, so
-mean pooling dilutes the discriminative signal roughly
-fivefold. Neither source paper confronts this, since
-\citeauthor{mckenzie2025}'s mean-beats-last result assumes lexically varied
-inputs. Builders of contrast datasets should expect their templating choices to
-select the pooling scheme.
+\textbf{The layer that writes a behaviour best can sit earlier than the
+layer that reads it best.} The causal blocks lie within layers 6--15 for
+all three behaviours while detection peaks at layers 12, 20 and 19, so
+the two coincide only for deception. One reading is that the behaviour is
+\emph{computed} early, where intervening still changes downstream
+processing, and becomes \emph{legible} later.
 
-\textbf{Measuring coherence changes how the causal metric should be
-interpreted.} Mass-mean's advantage co-occurs with faster quality degradation
-(coherence 6.21 to 3.92 on high-stakes and 8.17 to 1.00 on sycophancy at
-coefficient $+2$, where logistic regression stays within 0.3 of baseline on
-both sets and the attention direction falls at most to 5.42), and
-in the extreme case the two instruments disagree in sign while coherence
-arbitrates: on math, judged sycophancy reaches 9.42 while the NIE reads
-$-0.92$, at coherence 4.17. A readout-based metric cannot see
-this, because a degraded model still emits the target token. ``More causal''
-should therefore be read as ``larger effect per unit coefficient, with faster
-degradation''. This distinction is unavailable to \citeauthor{marks2024}'s
-readout-only design, and it suggests a practical division of labour: fit
-logistic regression on mean-pooled activations when a monitor is wanted, take
-the mass-mean direction when a lever is wanted, and always measure quality
-alongside effect.
+\textbf{Detection is higher in distribution than out, and the more similar
+the held-out data, the smaller the gap.} \citeauthor{marks2024} warn that
+probes may identify ``not truth, but other features that correlate with
+truth on their training data'', and evaluate across datasets for that
+reason. The same concern explains the pattern here: all three behaviours
+drop from ID to OOD, by amounts that depend on how dissimilar the held-out
+data is. AI Liar and math, which keep the training format, barely drop,
+while Roleplaying and Anthropic-HH, which do not, drop most. This stresses
+the need for evaluation sets as dissimilar from training as the
+deployment setting, rather than held-out splits of the same data.
 
-\textbf{Out-of-distribution detection is what limits deployment.} Every behaviour loses
-substantial AUROC out-of-distribution: deception 1.000 to 0.722, high-stakes 0.996
-to 0.774, and sycophancy 0.976 to 0.879. At this scale these probes would not
-support deployment as monitors, consistent with Apollo's conclusion that current
-performance is insufficient as a robust defence.
+\textbf{Our probes score below the reference papers' on the shared sets,
+most plausibly because of scale.} Apollo and \citeauthor{mckenzie2025}
+report higher AUROCs on Roleplaying and Anthropic-HH with 70B models than
+we reach with 8B (\S\ref{sec:results}). This is consistent with
+\citeauthor{marks2024}'s evidence that ``linear representations of truth
+emerge with scale'', and \citeauthor{mckenzie2025} measure the effect
+directly: the same probe scores 0.887, 0.913 and 0.916 on 8B, 27B and 70B
+models. 
+
+\textbf{The two steering instruments measure different things.} The
+readout responds to steering on every set, but judged behaviour is nearly
+flat almost everywhere, and the two can disagree outright: on sycophancy
+at coefficient $+1$ the mass-mean readout drops to negative while the judge
+reaches its maximum. The readout measures the model's perception of a
+transcript and the judge what it elicits, so the metric to report depends
+on the task: a monitor cares about perception, an intervention about
+elicited behaviour.
+
+\textbf{Coherence often degrades at large coefficients.} A common pattern
+is an inverted U: judged coherence is high at small magnitude coefficients and
+collapses toward both extremes. Roleplaying and math show it most clearly,
+for mass-mean on both and for logistic regression and attention
+respectively. \citeauthor{rimsky2024} find the same, that ``steering with
+larger multipliers results in a degradation in the quality of the
+open-ended text'', and limit their multiplier range for that reason.
+
+\textbf{Negative coefficients do not mirror positive ones.} Our directions
+are trained from behaviour-off to behaviour-on, and every steered item is
+already behaviour-off, so a negative coefficient asks the model to be less
+of something it is not. The negative side of the sweep has no consistent
+shape as a result: flat near zero on Anthropic-HH, negative on math, and
+rising again at $-2$ for mass-mean and logistic regression on Roleplaying.
+Negative steering therefore has no fixed behaviour here, and warrants
+study in its own right.
 
 \subsection{Limitations}
-\label{sec:limitations}
 
-\textbf{The judge is unvalidated.} The blind agreement protocol has not been run,
-and coherence carries much of the interpretation above. CAA validated its judge by
-manual spot-check; that step is outstanding here.
+\textbf{The sycophancy probes are not checked against an echo shortcut.}
+A sycophantic and a genuine agreement both echo the user, so a probe
+reading surface agreement could not separate them. We should measure each
+probe's AUROC on sycophantic against genuine agreements. Without this, the sycophancy AUROCs may partly measure the
+echo.
 
-\textbf{The NIE is both the selection criterion and the reported metric, and
-the selection uses only mass-mean.} Blocks are chosen to maximise
-summed NIE and NIE is then reported at those blocks; the sweep uses training
-transcripts, so this is hyperparameter selection rather than leakage, but
-out-of-distribution figures deserve more weight. The sweep also uses only the
-mass-mean direction; a logistic-regression sweep showing the block barely moves
-would close the alternative explanation that the block suits mass-mean.
+\textbf{The judge is unvalidated.} Behaviour and coherence scores come from
+a single LLM judge (Claude Haiku 4.5) whose agreement with human raters was
+not measured.
 
-\textbf{The roleplaying judge measurement cannot show induction.} Its prompts are
-inherently pressured, and the honest/deceptive flag is a no-op once the completion
-is stripped, so no behaviour-off variant exists. The baseline is already 6.71/10
-deceptive and the judged scores stay within 5.58--7.96 throughout, so the
-measurement is uninformative rather than evidence that steering failed. Its
-detection results and NIE are unaffected.
+\textbf{No last-pooled direction is steered.} The steering grid contains
+mass-mean and logistic regression fit on mean-pooled activations and the
+attention direction, but not the last-pooled probes that detect sycophancy
+best. The sycophancy steering inversion may therefore partly reflect which
+directions were available rather than the estimators.
 
-\textbf{Several cells of the comparison are missing.} No covariance-corrected
-mass-mean probe, which both
-\citet{marks2024} and Apollo benchmark; no control corpus, so TPR at 1\% FPR is
-not comparable to Apollo's; no reverse steering direction; no insider-trading or
-sandbagging evaluation. Single model, single seed.
+\textbf{Both layer selections are anchored on mass-mean.} The detection
+layer is the argmax of the mass-mean probe's cross-validated AUROC, and the
+steering block is the window of maximum mass-mean NIE. Logistic regression
+and the attention probe are therefore evaluated at a layer and a block
+chosen for mass-mean, a mild bias toward it on both sides of the
+comparison.
 
-%=======================================================================
 \section{Future Work}
 
 The nearest next step is to steer in the other direction. Everything here

@@ -1,0 +1,27 @@
+% DRAFT — Limitations replacement for review. Not \input anywhere.
+% Four items, one short paragraph each.
+
+\subsection{Limitations}
+
+\textbf{The sycophancy probes are not checked against an echo shortcut.}
+A sycophantic and a genuine agreement both echo the user, so a probe
+reading surface agreement could not separate them. We should measure each
+probe's AUROC on sycophantic against genuine agreements. Without this, the sycophancy AUROCs may partly measure the
+echo.
+
+\textbf{The judge is unvalidated.} Behaviour and coherence scores come from
+a single LLM judge (Claude Haiku 4.5) whose agreement with human raters was
+not measured.
+
+\textbf{No last-pooled direction is steered.} The steering grid contains
+mass-mean and logistic regression fit on mean-pooled activations and the
+attention direction, but not the last-pooled probes that detect sycophancy
+best. The sycophancy steering inversion may therefore partly reflect which
+directions were available rather than the estimators.
+
+\textbf{Both layer selections are anchored on mass-mean.} The detection
+layer is the argmax of the mass-mean probe's cross-validated AUROC, and the
+steering block is the window of maximum mass-mean NIE. Logistic regression
+and the attention probe are therefore evaluated at a layer and a block
+chosen for mass-mean, a mild bias toward it on both sides of the
+comparison.
