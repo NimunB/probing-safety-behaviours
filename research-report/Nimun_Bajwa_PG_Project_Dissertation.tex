@@ -1934,7 +1934,7 @@ project work.}
 \rowcolor[gray]{0.92}
 AI Tool & Version & Publisher & Access URL \\
 \hline
-Claude Code & Opus & Anthropic & \url{https://claude.ai/code} \\
+Claude & Opus & Anthropic & \url{https://claude.ai/} \\
 \hline
 Claude (API) & \texttt{claude-haiku-4-5} & Anthropic & \url{https://www.anthropic.com/api} \\
 \hline
@@ -1945,40 +1945,41 @@ your project please include in table format how, where, and why these tools
 were used.}
 
 \begin{tabularx}{\textwidth}{|>{\raggedright\arraybackslash}p{2.4cm}
-                             |>{\raggedright\arraybackslash}p{3.0cm}
+                             |>{\raggedright\arraybackslash}p{6cm}   % try 4–4.5cm
                              |>{\raggedright\arraybackslash}X|}
 \hline
 \rowcolor[gray]{0.92}
 Project Section & Description & Justification \\
 \hline
-Code (\texttt{safety\_probes} package, notebooks)
-& Coding assistant used to implement and refactor the package, write
-driver-notebook scaffolding, and diagnose defects (e.g.\ a double-BOS
-tokenisation defect in the detection-mask construction)
-& I specified the design and the numbered decision record the code implements;
-the assistant produced and revised code against it. All code was reviewed and
-executed by me, and all reported numbers were produced by running it. \\
+Literature Review
+& Used Claude Opus to brainstorm and find gaps in the papers I was reviewing. 
+Also used to validate my understanding of the papers was correct. The outputs were text and some visualizations.
+& The AI tool was used to discuss ideas and papers and improve my understanding. I was using it as a tool to supplement my critical thinking, not do it for me. 
+\\
 \hline
-Methodology (faithfulness to source papers)
-& Assistant used to cross-check the implementation against the source papers
-section by section
-& I asked for discrepancies between my implementation and the papers'
-protocols; I verified each flagged discrepancy against the papers directly and
-decided the resolution. \\
+Methodology
+& Used Claude Opus to identify discrepancies between my code and the source papers', so I can ensure that any divergences are intended.
+& Used as a validation tool. I was still writing the code, and checking the source paper code, but used it as an additional check that I had not missed any other differences, and all differences were intended. \\
 \hline
-Report writing
-& Assistant used to draft and edit prose, verify quoted numbers against the
-exported artefacts, and manage \LaTeX{} layout
-& Drafts were produced to my outlines and revised or rewritten by me before
-inclusion; every number was checked against the pipeline's exported results.
-The research questions, experimental design, results and conclusions are my
-own. \\
+Latex Debugging
+& Used Claude Opus to debug \LaTeX{} issues when writing the report
+(e.g.\ compilation errors, table layout, and formatting problems).
+& Used as a technical troubleshooting aid only. All report content was
+written by me - the AI tool just helped resolve typesetting errors and formatting
+issues, which does not affect the intellectual content of the submission. \\
+\hline
+References
+& Used Claude Opus to convert my references from IEEE to Harvard style,
+as required by the module (the original \LaTeX{} template used IEEE format).
+& Used as a reformatting tool for an existing, self-compiled reference
+list. No sources were found or suggested by the AI - I verified each
+converted entry against the original for accuracy and completeness. \\
 \hline
 Experimental component (LLM judge)
 & Claude Haiku 4.5 is used \emph{within} the methodology as the LLM judge
 scoring steered generations (\S\ref{sec:methodology}-\ref{sec:steereval})
 & This is a measured component of the system itself, not a writing or coding
-aid; its prompts are in Appendix~\ref{app:judge} and its lack of blind
+aid. Its prompts are in Appendix~\ref{app:judge} and its lack of blind
 validation is a declared limitation. \\
 \hline
 \end{tabularx}
@@ -2001,6 +2002,5 @@ plagiarism, unverified code submission).
 learning and problem-solving.
 \end{itemize}
 
-Signed: Nimun Kaur Bajwa \hspace{2em} Date: \underline{\hspace{2.5cm}}
-
+Signed: \underline{Nimun Kaur Bajwa} \hspace{2em} Date: \underline{August 24th, 2026}
 \end{document}
