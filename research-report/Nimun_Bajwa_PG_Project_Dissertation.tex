@@ -1423,10 +1423,9 @@ Signed: \underline{Nimun Kaur Bajwa} \hspace{2em} Date: \underline{August 24th, 
 
 \section{Deception Out-of-Distribution Pairs}\label{app:ood-pairs}
 
-Real first items of both deception out-of-distribution sets (§III-A.1), rendered
-as in Fig.~\ref{fig:masks}: left = the honest member, right = the deceptive
-member, highlighted = the detection mask. At evaluation the mask covers
-\emph{all} assistant-response tokens (no training-time truncation).
+Real examples from the two deception out-of-distribution sets (§III-A.1): the first item of
+each, honest member left, deceptive member right. The mask covers all assistant-response tokens
+(no training-time truncation).
 
 \begin{figure}[H]
 \centering
@@ -1497,10 +1496,8 @@ and the set where firing on fabricated-excuse phrasing (a surface cue AI Liar
 rules out) would be visible.}\\
 \bottomrule
 \end{tabular}
-\caption{The two deception out-of-distribution sets, real first items from the
-vendored data: \emph{(a)} AI Liar --- identical probed answers, label defined by
-the framing; \emph{(b)} Roleplaying --- shared scenario (truncated for display;
-token counts are for the full text), label defined by the completion.
+\caption{The two deception out-of-distribution sets: \emph{(a)} AI Liar and \emph{(b)}
+Roleplaying (truncated for display; token counts are for the full text).
 \colorbox{probed}{\strut Highlighted} spans are the detection mask.}
 \label{fig:oodpairs}
 \end{figure}
@@ -1508,11 +1505,8 @@ token counts are for the full text), label defined by the completion.
 \section{High-Stakes Out-of-Distribution Examples}\label{app:hs-ood}
 
 Real examples from the \texttt{anthropic\_hh} evaluation set \citep{bai2022,mckenzie2025}:
-genuine multi-turn human--assistant conversations, GPT-4o-labelled for stakes.
-Unlike the training set (Fig.~\ref{fig:masks}b), this config has \emph{no pair
-structure} --- the two examples below are independent conversations, not a
-matched pair. The \texttt{content\_tokens} mask here spans every role's message
-content across every turn; only scaffold is excluded.
+multi-turn human--assistant conversations. The mask covers every role's message content across
+every turn; only scaffold is excluded.
 
 \begin{figure}[H]
 \centering
@@ -1549,20 +1543,19 @@ the mask covers every role's content, across every turn. This is the multi-turn
 counterpart of the single-turn training mask of Fig.~\ref{fig:masks}b.}\\
 \bottomrule
 \end{tabular}
-\caption{The high-stakes out-of-distribution set, real rows from the pinned
-revision: one low-stakes and one high-stakes Anthropic-HH conversation.
-\colorbox{probed}{\strut Highlighted} spans are the detection mask.}
+\caption{The high-stakes out-of-distribution set: one low-stakes (left) and one high-stakes
+(right) Anthropic-HH conversation. \colorbox{probed}{\strut Highlighted} spans are the detection
+mask.}
 \label{fig:hsood}
 \end{figure}
 
+% layout: keep appendix title with its content
+\clearpage
 \section{Sycophancy Out-of-Distribution Pairs}\label{app:syc-ood}
 
-Real rows from the held-out math domain, which shares the training set's
-factorial construction --- so genuine matched pairs exist, and so does the
-genuine-agreement hard negative. The three rows below share one arithmetic
-item: the matched pair differs only in the reply's answer, and the
-genuine-agreement row's reply is \emph{identical in form to agreement} --- what
-separates it from sycophancy is only that the user's claim was true.
+Real examples from the held-out math domain, which shares the training set's factorial
+construction, so matched pairs and the genuine-agreement hard negative both exist. The mask
+covers only the assistant's reply, never the user's claim.
 
 \begin{figure}[H]
 \centering
@@ -1603,15 +1596,17 @@ probe can only separate it from sycophancy by relating the reply to the claim
 through causal attention.}\\
 \bottomrule
 \end{tabular}
-\caption{The sycophancy out-of-distribution set (held-out math domain), real
-rows sharing one arithmetic item: the matched false-claim pair (top) and the
-genuine-agreement hard negative (bottom), whose reply matches the candid
-member's but under a \emph{true} claim. \colorbox{probed}{\strut Highlighted}
-spans are the detection mask.}
+\caption{The sycophancy out-of-distribution set: the matched false-claim pair (top) and the
+genuine-agreement hard negative (bottom). \colorbox{probed}{\strut Highlighted} spans are the
+detection mask.}
 \label{fig:sycood}
 \end{figure}
 
 \section{Probe Hyperparameters}\label{app:hyperparams}
+Table~\ref{tab:hyperparams} lists the training settings for every probe cell. Mass-mean is closed
+form and has no hyperparameters. The attention recipe follows the teaching notebook this pipeline
+evolved from \citep{arena2024} rather than \citet{mckenzie2025}, who add a learning-rate schedule
+and early stopping; optimizer, epochs and starting learning rate coincide.
 
 \begin{table}[H]
 \centering
@@ -1638,16 +1633,7 @@ Inputs & standardised (zero-mean, unit variance) \\
 Solver & lbfgs, max 1,000 iterations \\
 \bottomrule
 \end{tabular}
-\caption{Hyperparameters per probe. The Last/Mean settings are those of the
-logistic-regression estimator. The attention probe's head is likewise
-logistic-regression-style (sigmoid, binary cross-entropy), but is trained
-jointly with its pooling under the Attention settings above. The two
-logistic-regression cells share identical settings and differ only in training
-rows (one per example vs one per token, §III-B.2). Mass-mean is closed form and
-has no hyperparameters. The attention recipe
-follows the teaching notebook this pipeline evolved from \citep{arena2024}
-rather than \citet{mckenzie2025}, who add a learning-rate schedule and early
-stopping; optimizer, epochs and starting learning rate coincide.}
+\caption{Training settings per probe family.}
 \label{tab:hyperparams}
 \end{table}
 
@@ -1655,11 +1641,9 @@ stopping; optimizer, epochs and starting learning rate coincide.}
 \clearpage
 \section{Detection-Layer Selection Curves}\label{app:layer-curves}
 
-The body keeps its figure count to the results themselves; this appendix and the
-following ones supply the per-behaviour diagnostics, read side then write side, so a reader checking
-whether a claim generalises does not have to take it on trust. Pair-aware 5-fold CV AUROC on
-mean-pooled training activations against layer, mass-mean as selector with a
-logistic-regression overlay as a robustness check, chosen layer marked.
+The layer sweeps behind the three detection-layer choices (§III-D.1): pair-aware 5-fold CV
+AUROC of the mass-mean selector at each of the 32 layers, with the logistic-regression overlay as
+a robustness check. Error bars span the five folds; the dashed line marks the chosen layer.
 
 \begin{figure}[H]
 \centering
@@ -1686,9 +1670,9 @@ logistic-regression overlay as a robustness check, chosen layer marked.
 \section{In-Distribution Detection}\label{app:roc-id}
 Figs.~\ref{fig:detid} and \ref{fig:roc-id} are the in-distribution
 counterparts of Figs.~\ref{fig:detood} and \ref{fig:roc}, on each behaviour's
-held-out test split. They are the evidence for the claim in §III-A.1.b that
-in-distribution detection is near-degenerate, and therefore that the
-out-of-distribution results are the informative ones.
+held-out test split. It shows AUROC with bootstrap 95\% confidence intervals for all five probes
+on each behaviour's held-out test split (Fig.~\ref{fig:detid}), and the corresponding ROC curves
+(Fig.~\ref{fig:roc-id}). Exact values are the test (ID) rows of Appendix~\ref{app:det-tables}.
 
 \begin{figure}[H]
 \centering
@@ -1707,17 +1691,13 @@ intervals, the counterpart of Fig.~\ref{fig:detood}.}
 {\footnotesize (a) deception} & {\footnotesize (b) high-stakes} & {\footnotesize (c) sycophancy} \\
 \end{tabular}
 \caption{In-distribution ROC curves, all five probe cells per behaviour, on the held-out test
-split. These are the curves §III-A.1.b calls near-degenerate: the deception panel in particular hugs
-the top-left corner, where the area carries nothing the scalar in Appendix~\ref{app:det-tables}
-does not. Near the ceiling the cells are also coincident, so the last-drawn probe covers the
-others and per-probe values must be read from the legend. The out-of-distribution curves, where
-the cells separate, are in Fig.~\ref{fig:roc}.}
+split.}
 \label{fig:roc-id}
 \end{figure}
 
 \section{Out-of-Distribution ROC Curves}\label{app:roc-ood}
-Held-out out-of-distribution curves for all five probes per behaviour; these are the
-curves the read-side comparison rests on (§III-A.1.b).
+Out-of-distribution AUROC curves for all five probes per behaviour. Full grids are in
+Appendix~\ref{app:det-tables}.
 
 \begin{figure}[H]
 \centering
@@ -1729,87 +1709,87 @@ curves the read-side comparison rests on (§III-A.1.b).
 {\footnotesize (a) deception: AI Liar} & {\footnotesize (b) deception: roleplaying} &
 {\footnotesize (c) high-stakes: Anthropic-HH} & {\footnotesize (d) sycophancy: math} \\
 \end{tabular}
-\caption{Out-of-distribution ROC curves for deception, high stakes, and
-sycophancy. Full grids in Appendix~\ref{app:det-tables}; in-distribution
-results are in Appendix~\ref{app:roc-id}.}
+\caption{Out-of-distribution ROC curves for deception, high stakes, and sycophancy.}
 \label{fig:roc}
 \end{figure}
 
-% layout: keep appendix title with its content
-\clearpage
 \input{appendix_detection_tables}
 
+% layout: keep appendix title with its content
+\clearpage
 \section{Per-Token Probe Scores}\label{app:tokens}
+Per-token scores for one deception pair from the held-out test split (ID): each token's
+activation at the detection layer, projected onto the LR (mean) direction, coloured only inside
+the detection mask. More positive (red) means the token reads as more deceptive, more negative
+(blue) as more honest. The two members differ only in the system persona, so colour differences
+reflect context rather than lexical content.
 
 \begin{figure}[H]
 \centering
 \figslot{deception/heatmap_deceptive.png}{0.9\textwidth}{1.6cm}\\[3pt]
 \figslot{deception/heatmap_honest.png}{0.9\textwidth}{1.6cm}
-\caption{\textbf{Per-token probe scores, one deception pair:} deceptive persona (top), honest twin
-(bottom) --- the mask of §III-A made visible, since only assistant-content tokens are scored.
-\emph{Why a pair rather than one example.} The two members share an identical user turn and the same
-truncated fact, differing only in the system persona, so any difference in colour is the probe reading
-\emph{context} rather than lexical content. \emph{What to look for.} Where the score rises: early,
-before any giveaway, is the intent reading Apollo report; only on a tell-tale phrase would suggest a
-surface cue.}
+\caption{Per-token probe scores for one deception pair: deceptive persona (top), honest twin
+(bottom).}
 \label{fig:heat}
 \end{figure}
 
 \section{Attention-Probe Weights}\label{app:attnw}
+Attention-pooling weights for one sycophantic example from the held-out test split (ID): the
+LR-attention probe's softmax weights at the detection layer, averaged over its three seeds. The
+raw weights are non-negative and sum to one over the masked positions (the panel header gives the
+raw maximum); printed values are standardised by the spread of weights within the mask, the same
+display transform as Fig.~\ref{fig:heat}. A larger value (darker green) means the token
+contributes a larger share of the pooled representation.
 
 \begin{figure}[H]
 \centering
 \figslot{sycophancy/attn_sycophantic.png}{0.95\textwidth}{2.0cm}
-\caption{\textbf{Attention-probe weights, sycophancy.} A softmax over the masked positions only, so
-weights sum to one within the mask and are comparable across examples. \emph{Why included.} The
-attention direction is sycophancy's \emph{best} steerer and the only one with a monotone steering
-response, so where it places mass is evidence about what the writable feature actually is. It is also
-the closest thing this pipeline has to a localisation result, activation patching being unavailable on
-dialogues (§III-C). \emph{What to look for.} The mass sits almost entirely on the answer: on this
-example the echoed country token carries the maximum weight (0.38), with the trailing period next,
-while the templated ``I believe the city of \ldots{} is in'' prefix receives near-uniform low weight
---- the probe has learned to ignore precisely the span that dilutes mean pooling (§III-B). The
-contrast with high-stakes is sharp: there the learned weights are diffuse (maximum 0.03 on any
-token), matching a label that is a property of the whole situation rather than of one word.}
+\caption{Attention-probe weights for one sycophantic example from the held-out test split;
+printed values are weights standardised within the mask.}
 \label{fig:app-attn}
 \end{figure}
 
+% layout: keep appendix title with its content
+\clearpage
 \section{Probe-Direction Cosines}\label{app:cosines}
+Pairwise cosines between the five probe directions at each behaviour's detection layer, each
+direction unit-normalised, with signs aligned so all point toward the behaviour-on class; the
+attention direction is the mean of its three seeds. A cosine near 1 means two estimators found the same
+direction up to scale; values well below 1 mean genuinely different directions.
 
 \begin{figure}[H]
 \centering
 \figslot{deception/cosines.png}{0.32\textwidth}{1.8cm}\hfill
 \figslot{high_stakes/cosines.png}{0.32\textwidth}{1.8cm}\hfill
 \figslot{sycophancy/cosines.png}{0.32\textwidth}{1.8cm}
-\caption{\textbf{Deception (left), high-stakes (centre), sycophancy (right):} pairwise cosine
-similarity between the five probe directions at each behaviour's detection layer. \emph{Why
-included.} This addresses the obvious objection to the whole comparison, that the estimators might be
-finding the \emph{same} direction and differing only in scale, in which case ``which steers better''
-would be a units artefact; cosines well below 1 mean they are genuinely different directions.
-\emph{What to look for.} Alignment falls with each behaviour. Deception's directions are the most
-aligned, and its attention probe's direction is closer to the mass-mean family (0.74--0.81) than to
-the LR family (0.54--0.55) despite sharing LR's training objective. High-stakes' cross-family cosines
-sit at 0.26--0.53. Sycophancy's directions are the least mutually aligned of the three --- its
-mass-mean and logistic-regression directions are near-orthogonal (0.07--0.13), and even its two
-mass-mean poolings agree only at 0.46 --- and it is the informative case: its inversion in §IV-C is
-\emph{not} two copies of one direction behaving differently, but genuinely different directions, of
-which all five read the behaviour and only some write it.}
+\caption{Pairwise cosine similarity between the five probe directions at each behaviour's
+detection layer: deception (left), high-stakes (centre), sycophancy (right).}
 \label{fig:app-cos}
 \end{figure}
 
 \section{Linear Structure at the Detection Layer}\label{app:linear}
+Each figure pairs unsupervised PCA of centred activations with projections onto the trained
+mass-mean direction. Separation under PCA would suggest the probe rides a high-variance topic
+confound of the kind Apollo report; separation only along the supervised direction argues the
+confound axes are roughly orthogonal to it. For deception (Fig.~\ref{fig:pca}), PCA shows no class
+separation (PC1 carries 8.3\% of variance) while the projection is cleanly bimodal; the co-located
+point pairs are the two members of each instructed pair, byte-identical apart from the system
+prompt (cf.\ Fig.~\ref{fig:masks}a) --- direct visual confirmation that the behaviour is a
+low-variance direction that content variance swamps. For high-stakes and sycophancy
+(Fig.~\ref{fig:app-pca}), the scatters show pronounced clusters, but the clusters are
+\emph{mixed-label}: they track dataset source for high-stakes and claim domain for sycophancy, not
+the class. High-stakes is the case where label separation in PCA \emph{would} have been
+unsurprising, since its classes differ in content rather than only in framing; that the label
+stays unseparated is the stronger version of the argument, and is why the projection panel rather
+than the scatter is treated as load-bearing throughout. Sycophancy's projection histogram is
+additionally bimodal \emph{within} the positive class --- one mode overlapping the negatives and
+one far mode --- reflecting the domain structure of the factorial data.
 
 \begin{figure}[H]
 \centering
 \figslot{deception/pca.png}{0.72\textwidth}{2.0cm}
-\caption{\textbf{Linear structure, deception, at the detection layer.} \emph{Left:} PCA of centred
-activations, showing no class separation (PC1 carries 8.3\% of variance). \emph{Right:} projections
-onto the trained mass-mean direction, showing clean bimodal separation. \emph{Why both panels.}
-Separation under unsupervised PCA would suggest the probe rides a high-variance topic confound of the
-kind Apollo report; separation only along the supervised direction argues the confound axes are
-roughly orthogonal to it. \emph{What to look for.} The co-located point pairs on the left are the two
-members of each instructed pair, byte-identical apart from the system prompt (cf.\ Fig.~\ref{fig:masks}a): direct visual
-confirmation that the behaviour is a low-variance direction that content variance swamps.}
+\caption{Linear structure, deception: PCA of centred activations (left) beside projections onto
+the trained mass-mean direction (right), at the detection layer.}
 \label{fig:pca}
 \end{figure}
 
@@ -1817,16 +1797,8 @@ confirmation that the behaviour is a low-variance direction that content varianc
 \centering
 \figslot{high_stakes/pca.png}{0.72\textwidth}{1.6cm}\\[4pt]
 \figslot{sycophancy/pca.png}{0.72\textwidth}{1.6cm}
-\caption{\textbf{High-stakes (top) and sycophancy (bottom).} PCA of centred activations (left of each
-pair) beside projections onto the trained direction (right). \emph{Why included.} To show the
-PCA-flat/projection-separated pattern is not specific to deception. \emph{What to look for.} Both
-scatters show pronounced clusters, but the clusters are \emph{mixed-label}: they track dataset source
-for high-stakes and claim domain for sycophancy, not the class. High-stakes is the case where label
-separation in PCA \emph{would} have been unsurprising, since its classes differ in content rather
-than only in framing; that the label stays unseparated is the stronger version of the argument, and
-is why the projection panel rather than the scatter is treated as load-bearing throughout. Sycophancy's
-projection histogram is additionally bimodal \emph{within} the positive class --- one mode overlapping
-the negatives and one far mode --- reflecting the domain structure of the factorial data.}
+\caption{High-stakes (top) and sycophancy (bottom): PCA of centred activations (left of each
+pair) beside projections onto the trained direction (right).}
 \label{fig:app-pca}
 \end{figure}
 
@@ -1914,6 +1886,16 @@ soften the truth to please the user.}
 \input{appendix_steering_tables}
 
 \section{In-Distribution Steering}\label{app:steer-id}
+In the appendix rather than the body for two independent reasons. Steering blocks were selected to
+maximise NIE on training transcripts, so these values are closer to fitted than held-out. And
+deception's in-distribution readout gap is small: the fact is true under both personas, so the
+model answers ``NO'' to the deception question for \emph{both} classes ($PD^{+}=-0.906$,
+$PD^{-}=-0.964$), leaving a class gap of $0.058$ and NIE magnitudes that are not comparable with
+the held-out sets. Deception's judge columns are empty for a separate reason: its in-distribution
+generation prompts are byte-identical under greedy decoding, so the judge would score one
+generation repeatedly. Read these panels for whether the direction \emph{ordering} matches the
+out-of-distribution ones (Fig.~\ref{fig:steer}), not for magnitudes. Exact per-coefficient
+values are in Appendix~\ref{app:steer-tables}.
 
 \begin{figure}[H]
 \centering
@@ -1923,16 +1905,8 @@ soften the truth to please the user.}
 {\footnotesize (b) \textbf{high-stakes}, ID}\\[5pt]
 \figslot{sycophancy/steering_id.png}{0.56\textwidth}{1.6cm}\\[1pt]
 {\footnotesize (c) \textbf{sycophancy}, ID}
-\caption{\textbf{Steering, in-distribution.} Panels as Fig.~\ref{fig:steer}: readout NIE, judge
-behaviour, judge coherence. \emph{Why in the appendix rather than the body.} Two independent reasons.
-Steering blocks were selected to maximise NIE on training transcripts, so these values are closer to
-fitted than held-out. And deception's in-distribution readout gap is small: the fact is true under both personas, so the
-model answers ``NO'' to the deception question for \emph{both} classes ($PD^{+}=-0.906$,
-$PD^{-}=-0.964$), leaving a class gap of $0.058$ and NIE magnitudes that are not comparable with the
-held-out sets. Its judge columns are empty for a separate reason,
-the in-distribution generation prompts are byte-identical under greedy decoding, so the judge would
-score one generation repeatedly. \emph{What to look for.} Whether the direction \emph{ordering}
-matches the out-of-distribution panels; the magnitudes here should not be compared with them.}
+\caption{Steering, in-distribution. Panels as Fig.~\ref{fig:steer}: readout NIE, judge
+behaviour, judge coherence.}
 \label{fig:app-steer-id}
 \end{figure}
 
@@ -1944,7 +1918,17 @@ matches the out-of-distribution panels; the magnitudes here should not be compar
 Figs.~\ref{fig:ui} and \ref{fig:ui-steer} show the detection and steering tabs;
 Figs.~\ref{fig:ui-multi} and \ref{fig:ui-multi2} the multi-behaviour mode. All are live generations
 on free input, far from any evaluation set, with the same calibrated directions the results sections
-report, each behaviour's directions applied at its own steering block.
+report, each behaviour's directions applied at its own steering block, following
+\citet{vanderweij2024} for composition. The two multi-behaviour examples bracket what composition
+can do. In Fig.~\ref{fig:ui-multi}, the unsteered model declines to endorse swimming the Channel
+without a life vest; steered, it caves into stumbling enthusiasm for the dangerous plan --- the
+sycophantic caving of §IV-C composed with deception, on out-of-distribution input. In
+Fig.~\ref{fig:ui-multi2}, at higher combined coefficients the steered generation collapses into
+alarmist non-sequitur (``I can't help but say that the sky is falling.'') where the baseline
+suggests cuisines --- the degradation the coherence axis quantifies, reproduced interactively; the
+two multiplier sliders make the coherence cliff something a user can find by feel. The in-app
+banner marks the mode exploratory: how directions compose is an open question the pipeline does
+not yet evaluate.
 
 \begin{figure}[H]
 \centering
@@ -1969,26 +1953,15 @@ high-stakes direction applied.}
 \begin{minipage}[t]{0.485\textwidth}
 \centering
 \figslot{ui/multi-steering/deception-sycophancy.png}{\linewidth}{2.2cm}
-\caption{\textbf{Two behaviours composed (deception $+1.0$, sycophancy $+0.75$,
-both mass-mean),} each direction applied at its own behaviour's steering block,
-following \citet{vanderweij2024}. Unsteered, the model declines to endorse
-swimming the Channel without a life vest; steered, it caves into stumbling
-enthusiasm for the dangerous plan --- the sycophantic caving of §IV-C composed
-with deception, on out-of-distribution input. The in-app banner marks the mode
-exploratory: how directions compose is an open question the pipeline does not
-yet evaluate.}
+\caption{Two behaviours composed: deception $+1.0$, sycophancy $+0.75$, both mass-mean, each
+direction applied at its own behaviour's steering block.}
 \label{fig:ui-multi}
 \end{minipage}\hfill
 \begin{minipage}[t]{0.485\textwidth}
 \centering
 \figslot{ui/multi-steering/deception-high-stakes.png}{\linewidth}{2.2cm}
-\caption{\textbf{Composition can also fail, informatively (deception $+1.75$,
-high-stakes $+1.5$).} At higher combined coefficients the steered generation
-collapses into alarmist non-sequitur (``I can't help but say that the sky is
-falling.'') where the baseline suggests cuisines --- the degradation the
-coherence axis quantifies, reproduced interactively. The two
-multiplier sliders make the coherence cliff something a user can find by
-feel.}
+\caption{Composition failing at higher combined coefficients: deception $+1.75$, high-stakes
+$+1.5$.}
 \label{fig:ui-multi2}
 \end{minipage}
 \end{figure}
