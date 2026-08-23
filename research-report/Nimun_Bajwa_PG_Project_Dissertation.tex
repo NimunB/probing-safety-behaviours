@@ -1125,37 +1125,29 @@ comparison.
 
 \section{Future Work}
 
-The nearest next step is to steer in the other direction. Everything here
-steers negatives \emph{toward} the behaviour, because induction is the cleaner
-causal test; the safety application runs the other way --- suppressing deception
-or sycophancy in contexts that elicit it --- and \citeauthor{marks2024} report
-that the two directions of the same intervention can diverge substantially, so
-suppression needs its own evaluation, with positives steered and the readout run
-in reverse. Three controls remain open: the blind judge validation, a
-steering-block sweep with the logistic-regression direction, and reporting
-$\cos(\Sigma^{-1}\boldsymbol{\theta}_{\mathrm{mm}},
-\boldsymbol{\theta}_{\mathrm{LR}})$, which \citeauthor{marks2024}'s 
-predicts is near 1 and would explain the read-side result mechanistically. The
-sycophancy inversion is directly testable --- restricting training to
-non-genuine-agreement negatives should, if the relational-label hypothesis is
-right, move mass-mean toward a causal lever at the cost of detection --- and its
-layer gap invites a layer-resolved analysis of where deference is computed
-versus where it is legible. Extending to 70B is the step the source papers most
-directly motivate: all three report that scale helps ---
-\citeauthor{marks2024} find linear truth structure emerges with scale and
-probes generalise better, with logistic regression's NIEs rising from
-0.13--0.19 at 13B to 0.55--0.99 at 70B, so their data predict the read/write
-gap should \emph{narrow}; \citeauthor{mckenzie2025}'s mean AUROC rises from
-0.887 to 0.916 from 8B to 70B; and Apollo's 70B probe holds the roleplaying
-set ours collapses on. Beyond that, user intention and refusal are the next
-behaviours, and replacing linear directions with sparse-autoencoder latents
-\citep{cunningham2023,bricken2023} would test whether a sparser, more
-interpretable basis separates the readable feature from the writable one ---
-the read/write comparison of this pipeline applied per-latent rather than
-per-direction. Finally, the interface already composes two behaviours'
+\textbf{Steering in the other direction.} Everything here steers
+behaviour-off items toward the behaviour. The safety application runs the
+other way, suppressing a behaviour the model is exhibiting, and
+\citeauthor{marks2024} find the two directions of the same intervention
+can diverge. Suppression needs its own evaluation, with behaviour-on items
+steered and the readout run in reverse.
+
+\textbf{Sparse autoencoders.} Replacing linear directions with
+sparse-autoencoder latents \citep{cunningham2023,bricken2023} would test
+whether a sparser basis separates the readable feature from the writable
+one, applying this pipeline's read/write comparison per latent rather than
+per direction.
+
+\textbf{Larger models.} Every gap to the reference papers was attributed
+to scale. Running the same pipeline on a 70B model, the size the reference papers
+work at, would test that directly and show whether the dissociation persists
+at scale.
+
+\textbf{Composing behaviours.} The interface already supports adding two behaviours'
 directions at separate blocks, the injection scheme \citet{vanderweij2024}
-found workable where a single summed vector fails; evaluating that composition
-with both of this pipeline's instruments is a natural extension.
+found workable where a single summed vector fails. Evaluating that
+composition with both of this pipeline's instruments is a natural
+extension.
 
 %=======================================================================
 \section*{Acknowledgment}
