@@ -52,6 +52,7 @@
 \usepackage{tikz}
 \usetikzlibrary{positioning,arrows.meta,fit,backgrounds}
 \usepackage[hidelinks]{hyperref}
+\usepackage{microtype}  % protrusion + font expansion: fewer lines, no visible change
 
 % Tighten the title area: less space between title and author block (default
 % adjustment -0.25em on top of a hardcoded 1em), and less below the author block
@@ -88,10 +89,16 @@
 \makeatletter
 % The third \@startsection argument indents the HEADING LINE only (1em at the
 % "B.1)" level, 2em at "B.1.a)"); body text below stays flush left.
+% Heading skips: IEEEtran's 1.5ex above / 0.7ex below trimmed to 1.2ex / 0.5ex at all
+% levels (fonts unchanged). ~1.3pt + 0.9pt per heading, ~50 headings in the body.
+\renewcommand{\section}{\@startsection{section}{1}{\z@}%
+  {1.2ex plus 1.5ex minus 0.5ex}{0.5ex plus 1ex minus 0ex}{\normalfont\normalsize\centering\scshape}}
+\renewcommand{\subsection}{\@startsection{subsection}{2}{\z@}%
+  {1.2ex plus 1.5ex minus 0.5ex}{0.5ex plus .5ex minus 0ex}{\normalfont\normalsize\itshape}}
 \renewcommand{\subsubsection}{\@startsection{subsubsection}{3}{1em}%
-  {1.5ex plus 1.5ex minus 0.5ex}{0.7ex plus 0.3ex}{\normalfont\normalsize\itshape}}
+  {1.2ex plus 1.5ex minus 0.5ex}{0.5ex plus 0.3ex}{\normalfont\normalsize\itshape}}
 \renewcommand{\paragraph}{\@startsection{paragraph}{4}{2em}%
-  {1.5ex plus 1.5ex minus 0.5ex}{0.7ex plus 0.3ex}{\normalfont\normalsize\itshape}}
+  {1.2ex plus 1.5ex minus 0.5ex}{0.5ex plus 0.3ex}{\normalfont\normalsize\itshape}}
 % Deep levels print their FULL nested path ("B.1)", "B.1.a)") instead of a bare
 % "1)"/"a)", so a heading is locatable without scrolling up. Counters stay
 % automatic — reordering a subsection still renumbers everything below it.
