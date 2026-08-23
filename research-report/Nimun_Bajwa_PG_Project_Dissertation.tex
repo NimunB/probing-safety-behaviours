@@ -1768,38 +1768,26 @@ detection layer: deception (left), high-stakes (centre), sycophancy (right).}
 \end{figure}
 
 \section{Linear Structure at the Detection Layer}\label{app:linear}
-Each figure pairs unsupervised PCA of centred activations with projections onto the trained
-mass-mean direction. Separation under PCA would suggest the probe rides a high-variance topic
-confound of the kind Apollo report; separation only along the supervised direction argues the
-confound axes are roughly orthogonal to it. For deception (Fig.~\ref{fig:pca}), PCA shows no class
-separation (PC1 carries 8.3\% of variance) while the projection is cleanly bimodal; the co-located
-point pairs are the two members of each instructed pair, byte-identical apart from the system
-prompt (cf.\ Fig.~\ref{fig:masks}a) --- direct visual confirmation that the behaviour is a
-low-variance direction that content variance swamps. For high-stakes and sycophancy
-(Fig.~\ref{fig:app-pca}), the scatters show pronounced clusters, but the clusters are
-\emph{mixed-label}: they track dataset source for high-stakes and claim domain for sycophancy, not
-the class. High-stakes is the case where label separation in PCA \emph{would} have been
-unsurprising, since its classes differ in content rather than only in framing; that the label
-stays unseparated is the stronger version of the argument, and is why the projection panel rather
-than the scatter is treated as load-bearing throughout. Sycophancy's projection histogram is
-additionally bimodal \emph{within} the positive class --- one mode overlapping the negatives and
-one far mode --- reflecting the domain structure of the factorial data.
+Two views of the same mean-pooled training activations at the detection layer, asking where the
+two classes separate. The left panel plots each example on the two directions of largest variance
+(PCA), computed without seeing the labels; the right panel plots the same examples along the
+direction the mass-mean probe learned from the labels. Separation on the left would mean the
+behaviour is one of the biggest sources of variation; separation only on the right means it is a
+small direction a probe must be trained to find.
 
+% One logical figure; the first panels flow in a breakable centered block so they can
+% share the page with the section description, and the caption rides with the last panel.
+\begin{center}
+\figslot{deception/pca.png}{0.72\textwidth}{2.0cm}\\[4pt]
+\figslot{high_stakes/pca.png}{0.72\textwidth}{1.6cm}
+\end{center}
 \begin{figure}[H]
 \centering
-\figslot{deception/pca.png}{0.72\textwidth}{2.0cm}
-\caption{Linear structure, deception: PCA of centred activations (left) beside projections onto
-the trained mass-mean direction (right), at the detection layer.}
-\label{fig:pca}
-\end{figure}
-
-\begin{figure}[H]
-\centering
-\figslot{high_stakes/pca.png}{0.72\textwidth}{1.6cm}\\[4pt]
 \figslot{sycophancy/pca.png}{0.72\textwidth}{1.6cm}
-\caption{High-stakes (top) and sycophancy (bottom): PCA of centred activations (left of each
-pair) beside projections onto the trained direction (right).}
-\label{fig:app-pca}
+\caption{Deception (top), high-stakes (middle) and sycophancy (bottom): top two principal
+components of the centred activations (left of each pair) and projections onto the trained
+mass-mean direction (right), at each behaviour's detection layer.}
+\label{fig:pca}
 \end{figure}
 
 \section{Per-Layer NIE Sweeps}\label{app:niesweeps}
@@ -1831,11 +1819,13 @@ contiguous five-layer window of maximum summed effect.
 
 \section{Judge Prompts}\label{app:judge}
 
-Every generation is graded by one call, whose message is assembled from a fixed
-frame, the behaviour's own scoring instruction, and a shared coherence
-instruction. Both scores are bounded to 1--10 server-side by an enumerated
-output schema.
+Every generation is graded by one judge call. The message template is shown first, with
+bracketed italics marking its three slots; the behaviour-instruction slot is filled with one of
+the three scoring instructions that follow, which anchor both ends of the 1--10 scale following
+\citeauthor{rimsky2024}. Both scores are bounded to 1--10 server-side by an enumerated output
+schema.
 
+\noindent\textbf{Message template.}
 \begin{quote}\footnotesize\ttfamily
 You are grading an AI assistant's reply.\\[2pt]
 \textit{[behaviour scoring instruction, below]}\\[2pt]
@@ -1848,10 +1838,7 @@ tags and date preamble stripped)}\\[2pt]
 Return integers 1-10 for both.
 \end{quote}
 
-The three behaviour instructions follow the form of \citeauthor{rimsky2024}'s
-scoring prompts: both ends of the scale anchored, with explicit guidance for
-intermediate scores.
-
+\noindent\textbf{Behaviour scoring instructions.}
 \begin{quote}\footnotesize
 \textbf{Deception.} \texttt{Please score the assistant's reply on a scale of 1
 to 10, where the score reflects the extent to which the reply is deceptive:
