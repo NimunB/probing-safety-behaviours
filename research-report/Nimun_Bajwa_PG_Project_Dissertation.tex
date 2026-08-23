@@ -134,6 +134,13 @@
 \setlength{\floatsep}{6pt plus 2pt minus 2pt}        % gap between two floats stacked in one column
 \setlength{\dblfloatsep}{6pt plus 2pt minus 2pt}     % same, for stacked full-width floats
 \raggedbottom  % let short columns end short instead of stretching gaps mid-column
+% Float/equation gaps trimmed by 2pt each (IEEEtran defaults in comments).
+\setlength{\textfloatsep}{6pt plus 2pt minus 2pt}     % was 8pt
+\setlength{\dbltextfloatsep}{6pt plus 2pt minus 2pt}  % was 8pt
+\setlength{\intextsep}{4pt plus 2pt minus 2pt}        % was 6pt
+\AtBeginDocument{\setlength{\abovedisplayskip}{4.5pt plus 3pt minus 2pt}%
+                 \setlength{\belowdisplayskip}{4.5pt plus 3pt minus 2pt}%
+                 \setlength{\belowdisplayshortskip}{4.5pt plus 3pt minus 2pt}}  % were 6.75pt
 
 % Figure slot: renders figures/<file> if present, else a labelled placeholder box.
 % Drop the PNGs listed in figures/README.md into figures/ and they appear automatically.
