@@ -1009,29 +1009,40 @@ logistic regression's stays flat near $8$ on both.
 
 \section{Discussion}
 
-\textbf{The read/write dissociation replicates, but only for some behaviours.}
-On two of three behaviours the directions that read best and write best differ,
-reproducing on safety behaviours what \citet{marks2024} found for truth, and
-here, unlike across papers, the model, layer, tokens, calibration and
-intervention site are identical throughout. On high-stakes each family wins its
-own side by a clear margin: logistic regression detects at 0.774 against
-mass-mean's 0.737, while mass-mean steers to NIE 1.34 at coefficient $2$
-against logistic regression's 0.32. Deception repeats the split on roleplaying
-(0.706 against 0.669 on the read side; $+0.35$ against $+0.04$ on the write
-side). Sycophancy shows it is not a law: mass-mean is simultaneously the best
-detector (0.879) and a non-monotone steerer that dips to $-0.92$ at the verdict
-coefficient, while the attention direction, at cosine 0.48 from it, steers
-cleanly to $+0.77$. The dissociation should therefore be treated as a property
-of a behaviour--representation pair rather than as guidance that generalises to
-an untested behaviour.
+\textbf{The read/write dissociation holds for two behaviours and inverts for
+the third.} For deception and high-stakes, logistic regression (LR (mean))
+detects best out of distribution and the mass-mean direction (MM (mean))
+steers best by the readout, reproducing the pattern \citeauthor{marks2024}
+report for truth. On the reading side, they find that mass-mean
+underperforms logistic regression on 7B models and only matches it at
+larger scale, so a logistic-regression win at 8B is what their result
+predicts. On the writing side, they and ITI \citep{li2023} find that the
+mass-mean direction steers better than the logistic-regression one.
+Sycophancy inverts the dissociation: MM (last) detects best, and the
+attention direction, from the logistic-regression family, steers best.
+This might indicate that the dissociation depends on the behaviour; the
+pooling paragraph below suggests it depends on the data instead.
 
-\textbf{The logistic-regression direction reads everywhere and writes almost
-nowhere.} Its best cell detects at 0.706 or better on every held-out set, yet
-its NIE at coefficient $2$ spans only $-0.09$ to $+0.32$ across the same four
-sets. This is the sharpest single form of the asymmetry, and it is the same
-pattern \citeauthor{marks2024}'s 13B numbers show for truth (0.13--0.19 against
-mass-mean's 0.77--0.90): a direction can be an excellent reader of a behaviour
-the model itself barely responds to.
+\textbf{The best pooling strategy depends on the behaviour and the data.}
+Whether an interaction is high-stakes depends on the whole situation, so
+the evidence is spread across the text rather than concentrated in one
+token. This holds both in distribution, where each item is one long user
+turn describing a situation, and out of distribution, where Anthropic-HH
+is a multi-turn dialogue between user and assistant; on both, the
+every-token probes win, as \citeauthor{mckenzie2025} also find. For our
+sycophancy data the opposite holds: the replies follow a template that
+repeats the user's claim and differs only in the final answer, so the
+difference between a sycophantic and a candid reply sits at the end, and
+the last-token probes win. This data difference might also explain why,
+for sycophancy alone, an LR-family (LR-attention) direction steers better than
+mass-mean. Each steering direction is fit on pooled replies. Because the
+replies share almost every token, mean pooling averages the one token that
+differs with the many that do not, and the mass-mean and
+logistic-regression directions, which both fit on mean-pooled activations, are
+diluted as a result. The attention probe learned to weight the answer
+token heavily (Fig.~\ref{fig:app-attn}), so its direction was fit where the
+two classes actually differ. The mass-mean probe that won detection was fit
+on the last token too, but was never steered. The inversion may therefore be a consequence of the data and the pooling it favours, rather than of the estimators.
 
 \textbf{The layer that writes a behaviour best can sit well below the layer
 that reads it best.} For high-stakes and sycophancy the causal band (6--10 in
