@@ -342,7 +342,8 @@ behaviour and increased their sense of control.
 \label{sec:methodology}
 
 All experiments use Llama-3.1-8B-Instruct in 8-bit on a single GPU, seeded at
-42 and deterministic throughout. We explore three behaviours: Deception, High
+42, with greedy decoding and seed-fixed splits so results replicate on re-run
+(Appendix~\ref{app:repro}). We explore three behaviours: Deception, High
 Stakes awareness, and Sycophancy. Each is defined by a single specification
 (class labels, mask policy, readout prompt, judge instruction, coefficient
 sweep) consumed by one shared pipeline.
@@ -1307,6 +1308,105 @@ top-down approach to AI transparency', \textit{arXiv preprint} arXiv:2310.01405.
 \onecolumn
 \appendices
 
+\section{Generative AI Declaration}
+\label{app:genai}
+\begingroup
+\setlength{\parindent}{0pt}
+\setlength{\parskip}{0.5em}
+\renewcommand{\arraystretch}{1.3}
+
+\begin{center}
+\textbf{ECS750P/ECS753P/ECS754P -- MSc Project Module}\\
+\textbf{Generative AI Tools -- Student Accountability Statement}
+\end{center}
+
+\textbf{Student Name:} Nimun Kaur Bajwa (250828810)\\
+\textbf{Project Title:} Probing and Steering for Safety-Relevant Behaviours in LLMs\\
+\textbf{Supervisor Name:} Massimo Poesio
+
+\textbf{1. Have you used Generative AI tools for your project?}\\
+\textbf{YES}
+
+\textbf{2. Please provide details of all the AI tools that you used in your
+project work.}
+
+\begin{tabularx}{\textwidth}{|p{3.6cm}|p{3.4cm}|p{3.4cm}|X|}
+\hline
+\rowcolor[gray]{0.92}
+AI Tool & Version & Publisher & Access URL \\
+\hline
+Claude & Opus & Anthropic & \url{https://claude.ai/} \\
+\hline
+Claude (API) & \texttt{claude-haiku-4-5} & Anthropic & \url{https://www.anthropic.com/api} \\
+\hline
+\end{tabularx}
+
+\textbf{3. If you have used Artificial Intelligence (AI) tools in any part of
+your project please include in table format how, where, and why these tools
+were used.}
+
+\begin{tabularx}{\textwidth}{|>{\raggedright\arraybackslash}p{2.4cm}
+                             |>{\raggedright\arraybackslash}p{6cm}   % try 4–4.5cm
+                             |>{\raggedright\arraybackslash}X|}
+\hline
+\rowcolor[gray]{0.92}
+Project Section & Description & Justification \\
+\hline
+Literature Review
+& Used Claude Opus to brainstorm and find gaps in the papers I was reviewing. 
+Also used to validate my understanding of the papers was correct. The outputs were text and some visualizations.
+& The AI tool was used to discuss ideas and papers and improve my understanding. I was using it as a tool to supplement my critical thinking, not do it for me. 
+\\
+\hline
+Methodology
+& Used Claude Opus to identify discrepancies between my code and the source papers', so I can ensure that any divergences are intended.
+& Used as a validation tool. I was still writing the code, and checking the source paper code, but used it as an additional check that I had not missed any other differences, and all differences were intended. \\
+\hline
+Latex Debugging
+& Used Claude Opus to debug \LaTeX{} issues when writing the report
+(e.g.\ compilation errors, table layout, and formatting problems).
+& Used as a technical troubleshooting aid only. All report content was
+written by me - the AI tool just helped resolve typesetting errors and formatting
+issues, which does not affect the intellectual content of the submission. \\
+\hline
+References
+& Used Claude Opus to convert my references from IEEE to Harvard style,
+as required by the module (the original \LaTeX{} template used IEEE format).
+& Used as a reformatting tool for an existing, self-compiled reference
+list. No sources were found or suggested by the AI - I verified each
+converted entry against the original for accuracy and completeness. \\
+\hline
+Experimental component (LLM judge)
+& Claude Haiku 4.5 is used \emph{within} the methodology as the LLM judge
+scoring steered generations (\S\ref{sec:methodology}-\ref{sec:steereval})
+& This is a measured component of the system itself, not a writing or coding
+aid. Its prompts are in Appendix~\ref{app:judge} and its lack of blind
+validation is a declared limitation. \\
+\hline
+\end{tabularx}
+
+\textbf{4. Generative AI Student Declaration}
+
+\begin{itemize}
+\setlength{\itemsep}{0.2em}
+\item I have declared all uses of AI tools (e.g., coding assistants, text
+generators, data analysis tools) in this project.
+\item I have reviewed and verified all AI-assisted content to ensure accuracy
+and suitability.
+\item I take full responsibility for the originality and integrity of my
+project submission.
+\item I have referenced all sources, including those suggested or produced with
+AI support.
+\item I have not used AI in ways that undermine academic honesty (e.g.,
+plagiarism, unverified code submission).
+\item My use of AI was supplementary and did not replace my own independent
+learning and problem-solving.
+\end{itemize}
+
+Signed: \underline{Nimun Kaur Bajwa} \hspace{2em} Date: \underline{August 24th, 2026}
+\endgroup
+\clearpage
+
 \section{Deception Out-of-Distribution Pairs}\label{app:ood-pairs}
 
 Real first items of both deception out-of-distribution sets (§III-A.1), rendered
@@ -1881,126 +1981,52 @@ feel.}
 
 \section{Reproducibility}
 \label{app:repro}
-Model \texttt{meta-llama/Llama-3.1-8B-Instruct} in 8-bit, seed 42, on one NVIDIA RTX 5090. Detection
-layers are 12 (deception), 20 (high-stakes) and 19 (sycophancy); steering blocks are 11--15, 6--10
-and 6--10 respectively. Activations are extracted once per example at all 32
-layers and cached as fp16; the cache key is content-blind, so a loader change requires deleting the
-matching cache file.
+\subsection{Setup}
+Model \texttt{meta-llama/Llama-3.1-8B-Instruct} in 8-bit, seed 42, on one NVIDIA RTX
+5090. Detection layers are 12 (deception), 20 (high-stakes) and 19 (sycophancy); steering blocks
+are 11--15, 6--10 and 6--10 respectively.
 
-\emph{Provenance and exact inputs.} Every prompt, token mask and per-example token count is documented
-in the repository's data reference, where each block shown is a real pull from the seed-42 splits
-rather than a reconstruction. Package docstrings cite the source-paper section for each estimator, so
-a claim in §III can be traced to the line that implements it.
-
-\emph{Splits.} Pair-aware throughout: by fact for deception, by pair for high-stakes, by prompt group
-for sycophancy. Layer and block selection use training data only; the block-selection sweep uses
-train-split transcripts while every reported curve uses held-out ones.
-
-\emph{Regenerating the appendix.} The detection tables are generated from
-\texttt{exported\_probes/} by \texttt{make\_appendix\_tables.py}, so re-running the pipeline and
-re-running that script is sufficient to bring them back into agreement with the artefacts.
-
-
-% The remaining appendices are figure-dominated; single-column layout lets each
-% figure take its natural width and keeps headings, figures and captions together.
-% \raggedbottom stops \flushbottom stretching short pages into sparse ones.
-\onecolumn
-\raggedbottom
-
-
-\section{Generative AI Declaration}
-\label{app:genai}
-\setlength{\parindent}{0pt}
-\setlength{\parskip}{0.5em}
-\renewcommand{\arraystretch}{1.3}
-
-\begin{center}
-\textbf{ECS750P/ECS753P/ECS754P -- MSc Project Module}\\
-\textbf{Generative AI Tools -- Student Accountability Statement}
-\end{center}
-
-\textbf{Student Name:} Nimun Kaur Bajwa (250828810)\\
-\textbf{Project Title:} Probing and Steering for Safety-Relevant Behaviours in LLMs\\
-\textbf{Supervisor Name:} Massimo Poesio
-
-\textbf{1. Have you used Generative AI tools for your project?}\\
-\textbf{YES}
-
-\textbf{2. Please provide details of all the AI tools that you used in your
-project work.}
-
-\begin{tabularx}{\textwidth}{|p{3.6cm}|p{3.4cm}|p{3.4cm}|X|}
-\hline
-\rowcolor[gray]{0.92}
-AI Tool & Version & Publisher & Access URL \\
-\hline
-Claude & Opus & Anthropic & \url{https://claude.ai/} \\
-\hline
-Claude (API) & \texttt{claude-haiku-4-5} & Anthropic & \url{https://www.anthropic.com/api} \\
-\hline
-\end{tabularx}
-
-\textbf{3. If you have used Artificial Intelligence (AI) tools in any part of
-your project please include in table format how, where, and why these tools
-were used.}
-
-\begin{tabularx}{\textwidth}{|>{\raggedright\arraybackslash}p{2.4cm}
-                             |>{\raggedright\arraybackslash}p{6cm}   % try 4–4.5cm
-                             |>{\raggedright\arraybackslash}X|}
-\hline
-\rowcolor[gray]{0.92}
-Project Section & Description & Justification \\
-\hline
-Literature Review
-& Used Claude Opus to brainstorm and find gaps in the papers I was reviewing. 
-Also used to validate my understanding of the papers was correct. The outputs were text and some visualizations.
-& The AI tool was used to discuss ideas and papers and improve my understanding. I was using it as a tool to supplement my critical thinking, not do it for me. 
-\\
-\hline
-Methodology
-& Used Claude Opus to identify discrepancies between my code and the source papers', so I can ensure that any divergences are intended.
-& Used as a validation tool. I was still writing the code, and checking the source paper code, but used it as an additional check that I had not missed any other differences, and all differences were intended. \\
-\hline
-Latex Debugging
-& Used Claude Opus to debug \LaTeX{} issues when writing the report
-(e.g.\ compilation errors, table layout, and formatting problems).
-& Used as a technical troubleshooting aid only. All report content was
-written by me - the AI tool just helped resolve typesetting errors and formatting
-issues, which does not affect the intellectual content of the submission. \\
-\hline
-References
-& Used Claude Opus to convert my references from IEEE to Harvard style,
-as required by the module (the original \LaTeX{} template used IEEE format).
-& Used as a reformatting tool for an existing, self-compiled reference
-list. No sources were found or suggested by the AI - I verified each
-converted entry against the original for accuracy and completeness. \\
-\hline
-Experimental component (LLM judge)
-& Claude Haiku 4.5 is used \emph{within} the methodology as the LLM judge
-scoring steered generations (\S\ref{sec:methodology}-\ref{sec:steereval})
-& This is a measured component of the system itself, not a writing or coding
-aid. Its prompts are in Appendix~\ref{app:judge} and its lack of blind
-validation is a declared limitation. \\
-\hline
-\end{tabularx}
-
-\textbf{4. Generative AI Student Declaration}
-
+\subsection{What is fixed}
+Re-running the three notebooks reproduces every reported number except the judge scores: the
+cross-validated AUROC layer curves and the detection layers chosen from them; the held-out AUROCs
+with their bootstrap CIs and TPR at 1\% FPR, in- and out-of-distribution; the per-layer NIE sweeps
+and the steering blocks chosen from them; the NIE at every steering coefficient; the
+probe-direction cosines; and the per-token score and attention-weight figures. Five things make
+this hold.
 \begin{itemize}
-\setlength{\itemsep}{0.2em}
-\item I have declared all uses of AI tools (e.g., coding assistants, text
-generators, data analysis tools) in this project.
-\item I have reviewed and verified all AI-assisted content to ensure accuracy
-and suitability.
-\item I take full responsibility for the originality and integrity of my
-project submission.
-\item I have referenced all sources, including those suggested or produced with
-AI support.
-\item I have not used AI in ways that undermine academic honesty (e.g.,
-plagiarism, unverified code submission).
-\item My use of AI was supplementary and did not replace my own independent
-learning and problem-solving.
+\item \textbf{Seeding.} Seed 42 is set once at model load. Each stochastic step (split
+  permutations, bootstrap resamples, the logistic-regression solver, attention-probe
+  initialisation) also seeds its own local generator at the point of use rather than drawing from
+  the global stream, so re-running or re-ordering notebook cells does not change the splits.
+\item \textbf{Cross-validation folds.} Group ids are sorted-index integers rather than Python's
+  per-process \texttt{hash()}, so \texttt{GroupKFold} produces the same folds in every kernel; the
+  group tensors are byte-identical across processes.
+\item \textbf{Inputs.} The deception and sycophancy source files are vendored in the repository at
+  fixed upstream commits with SHA-256 digests; the high-stakes dataset is pinned by Hugging Face
+  revision.
+\item \textbf{Decoding.} Greedy throughout: coefficient 0 is the baseline by construction, and
+  every generation is reproducible on the same hardware.
+\item \textbf{Environment.} Package versions are pinned in the repository's
+  \texttt{requirements.txt} (torch 2.11.0+cu128, transformers 4.57.6, bitsandbytes 0.49.2,
+  scikit-learn 1.9.0).
 \end{itemize}
 
-Signed: \underline{Nimun Kaur Bajwa} \hspace{2em} Date: \underline{August 24th, 2026}
+\subsection{What is not fixed}
+Three things are not: the judge's behaviour and coherence scores, the final digits of any
+number when re-run on different hardware, and the exact wording of steered generations on
+different hardware.
+\begin{itemize}
+\item \textbf{Judge scores.} The LLM-judge behaviour and coherence columns of the steering tables
+  can shift slightly on re-run: Anthropic does not guarantee identical outputs, even at
+  temperature 0. NIE, the deterministic metric, is what selected the blocks.
+\item \textbf{Final digits across GPUs.} GPU floating-point arithmetic is not perfectly
+  reproducible (summation order varies across cores, kernels and GPUs), so on different hardware
+  the AUROCs, NIEs and cosines reproduce to within their bootstrap CIs --- and the same layer and
+  block choices --- but not necessarily to the last digit. On the same GPU and software the
+  differences are typically zero.
+\item \textbf{Steered generations and the UI.} Identical on the same hardware (greedy decoding,
+  above), but on a different GPU one changed token early in the decode can alter the rest of the
+  text, so the examples shown may not match word-for-word.
+\end{itemize}
+
 \end{document}
