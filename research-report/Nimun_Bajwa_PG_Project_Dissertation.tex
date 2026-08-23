@@ -169,69 +169,76 @@
 
 %=======================================================================
 \begin{abstract}
-Activation probes are linear readouts of a language model's residual stream, used
+Activation probes are linear directions in a language model's residual stream, used
 both to \emph{detect} safety-relevant behaviours and, by adding their direction
 back into the stream, to \emph{steer} them. We explore how the main design
 choices behind such probes interact, within one pipeline and one model
 (Llama-3.1-8B-Instruct), across three behaviours: deception, high-stakes
 awareness and sycophancy. The pipeline crosses two estimators (difference-of-means
 and logistic regression) with three token-pooling schemes (last, mean and learned
-attention), selects layers separately by predictive and by causal criteria, and
+attention), selects layers separately by predictive and causal criteria, and
 evaluates every direction twice: as a detector on held-out and out-of-distribution
 data, and as a steering vector scored by a causal readout and by an LLM judge for
 behaviour and coherence. Prior work read together suggests a \emph{read/write
 dissociation}, in which logistic regression reads best but difference-of-means
-directions write best. The dissociation replicates here for deception and
-high-stakes, and \emph{inverts} for sycophancy, where difference-of-means is the
-best out-of-distribution detector and among the worst steerers. Pooling can matter
-more than the estimator, the layer that writes best sits below the layer that reads
-best for two of three behaviours, and scoring coherence alongside behaviour shows
-part of difference-of-means' causal advantage is steering harder rather than
-better. The exported probes and directions power an interactive interface through
-which a user can score and steer text directly.
+directions write best. We find that it holds for deception and high-stakes but
+not for sycophancy, where the pattern reverses. The reversal appears to follow from the data rather than from the
+estimators. The
+best pooling and the best layer depend on the behaviour, and the layer that
+steers best can sit well before the layer that detects best. The right
+steering metric depends on the task, and the two steering metrics can
+disagree outright. The exported probes and
+directions power an interactive interface through which a user can score and
+steer text directly.
 \end{abstract}
 
 %=======================================================================
 \section{Introduction}
 
-As language models are deployed in consequential settings, cheap monitoring of
-their internal state becomes a practical safety requirement. \emph{Activation
-probes}, linear readouts of the residual stream, are a leading candidate,
-flagging a property of interest at a fraction of the cost of an auxiliary monitor
-model \citep{alain2018,mckenzie2025}. Two questions decide whether such a probe is
-useful: does it \emph{detect} the property, separating positives from negatives
-both in- and out-of-distribution; and is the direction it finds
-\emph{causally implicated}, such that adding it to the residual stream changes
-what the model does?
+As model capabilities advance and they are deployed in increasingly
+consequential settings, the need to monitor their internal state grows.
+Their outputs cannot be taken at face value: reasoning models' stated
+chains of thought are not always faithful to their internal reasoning
+\citep{chen2025}. Detecting and removing undesirable behaviour therefore requires tools that look inside the model.
+\emph{Activation probes}, linear directions in the residual stream, are a
+leading candidate: they flag a property at a fraction of the cost of an
+auxiliary monitor model \citep{alain2018,mckenzie2025}, and a direction of
+the same kind, added back into the stream, can steer the behaviour it
+detects. Two questions decide whether a probe is useful: does it
+\emph{detect} the property, in and out of distribution, and is its
+direction \emph{causally implicated}, such that adding it changes what the
+model does?
 
-The high-level goal of this work is to explore the ways of probing and steering
-a model for safety-relevant behaviours, and to compare them fairly: how the
-probe estimators compare, how the token-aggregation options compare, and how a
-direction's quality as a \emph{reader} relates to its quality as a \emph{writer}.
-
-Prior work answers these questions separately, on different properties:
-difference-of-means (``mass-mean'') directions are reported as the most causally
-implicated for truth \emph{despite} comparable classification accuracy
-\citep{marks2024}, logistic-regression probes as the strongest detectors of
-strategic deception \citep{goldowsky2025}, learned pooling as decisive for
-high-stakes detection \citep{mckenzie2025}, and mean-difference vectors as
+Existing studies typically examine one of these questions for a single behaviour, estimator or pooling scheme. We
+wanted to see how these design choices interact, and so built one pipeline
+that runs two estimators (difference-of-means and logistic regression),
+three pooling schemes (last token, mean and learned attention) and three
+behaviours (deception, high-stakes awareness and sycophancy) through the
+same model, and evaluates every direction for both detection and steering.
+Difference-of-means (``mass-mean'')
+directions are reported as the most causally implicated for truth with lower 
+classification accuracy \citep{marks2024}, logistic-regression
+probes as the strongest detectors of strategic deception
+\citep{goldowsky2025}, learned pooling as the best aggregation for
+high-stakes detection \citep{mckenzie2025}, and difference-of-means vectors as
 effective steerers of open-ended generation \citep{rimsky2024}.
 
-Read together these suggest a \emph{read/write dissociation}: the direction that
-best reads a behaviour may not be the one that best writes it. But the suggestion
-is fragile. The results come from different models, behaviours, metrics and token
-policies, so any apparent dissociation could be an artefact of that heterogeneity.
-Testing it requires holding everything else fixed, which in turn requires settling
-questions the individual papers answer differently: which estimator to fit, which
-tokens to pool, which layer to read from, and where to intervene.
+Read together, these suggest a \emph{read/write dissociation}, in which
+the direction that best reads a behaviour is not the one that best writes
+it (logistic regression better for detection, difference-of-means better
+for steering), and that some pooling schemes are simply better than
+others. However, the evidence comes from different models, behaviours,
+metrics and token policies, so either pattern could be an artefact of
+comparing them. This is why we study these choices together: to make more robust observations about how estimator, pooling and behaviour determine a direction's effectiveness for detection and steering.
 
-We build one pipeline that fixes model, layer policy, token policy, calibration
-and intervention site, and run three behaviours through it --- deception,
-high-stakes awareness and sycophancy --- each specified as configuration rather
-than code, so the same cached activations yield every probe and every steering
-direction. The exported artefacts power an interactive interface for scoring
-and steering text directly (§\ref{sec:impl}). Code, datasets and the interface
-are available at \url{https://github.com/NimunB/probing-safety-behaviours}.
+
+The exported probes and directions also power an interactive interface for
+scoring and steering text directly (\S\ref{sec:impl}), to promote transparency and 
+control in the inference process.
+
+Code, datasets and
+the interface are available at
+\url{https://github.com/NimunB/probing-safety-behaviours}.
 
 %=======================================================================
 \section{Related Work}
@@ -1194,6 +1201,10 @@ Chen, Y., Wu, A., DePodesta, T., et al. (2024) `Designing a dashboard for
 transparency and control of conversational AI', \textit{arXiv preprint}
 arXiv:2406.07882.
 
+\bibitem[Chen et al.(2025)]{chen2025}
+Chen, Y., Benton, J., Radhakrishnan, A., et al. (2025) `Reasoning models
+don't always say what they think', \textit{arXiv preprint}
+arXiv:2505.05410.
 
 \bibitem[Cunningham et al.(2023)]{cunningham2023}
 Cunningham, H., Ewart, A., Riggs, L., Huben, R. and Sharkey, L. (2023) `Sparse
@@ -1239,11 +1250,6 @@ McKenzie, A., Pawar, U., Blandfort, P., Bankes, W., Krueger, D., Lubana, E.S.
 and Krasheninnikov, D. (2025) `Detecting high-stakes interactions with
 activation probes', \textit{arXiv preprint} arXiv:2506.10805.
 
-\bibitem[Meng et al.(2022)]{meng2022}
-Meng, K., Bau, D., Andonian, A. and Belinkov, Y. (2022) `Locating and editing
-factual associations in GPT', in \textit{Advances in Neural Information
-Processing Systems (NeurIPS)}.
-
 \bibitem[Pacchiardi et al.(2024)]{pacchiardi2024}
 Pacchiardi, L., Chan, A.J., Mindermann, S., et al. (2024) `How to catch an AI
 liar: lie detection in black-box LLMs by asking unrelated questions', in
@@ -1258,7 +1264,6 @@ A.M. (2024) `Steering Llama 2 via contrastive activation addition', in
 Perez, E., Ringer, S., Luko\v{s}i\=ut\.e, K., et al. (2023) `Discovering language
 model behaviors with model-written evaluations', in \textit{Findings of ACL 2023}.
 
-
 \bibitem[Scheurer et al.(2023)]{scheurer2023}
 Scheurer, J., Balesni, M. and Hobbhahn, M. (2023) `Large language models can
 strategically deceive their users when put under pressure',
@@ -1267,11 +1272,6 @@ strategically deceive their users when put under pressure',
 \bibitem[Sharma et al.(2023)]{sharma2023}
 Sharma, M., Tong, M., Korbak, T., et al. (2023) `Towards understanding sycophancy
 in language models', \textit{arXiv preprint} arXiv:2310.13548.
-
-\bibitem[Taori et al.(2023)]{taori2023}
-Taori, R., Gulrajani, I., Zhang, T., et al. (2023) \textit{Stanford Alpaca: an
-instruction-following LLaMA model}. Available at:
-\url{https://github.com/tatsu-lab/stanford_alpaca} (Accessed: 2 August 2026).
 
 \bibitem[Turner et al.(2023)]{turner2023}
 Turner, A.M., Thiergart, L., Udell, D., et al. (2023) `Activation addition:
@@ -1572,7 +1572,7 @@ logistic-regression overlay as a robustness check, chosen layer marked.
 \section{In-Distribution Detection}\label{app:roc-id}
 Figs.~\ref{fig:detid} and \ref{fig:roc-id} are the in-distribution
 counterparts of Figs.~\ref{fig:detood} and \ref{fig:roc}, on each behaviour's
-held-out test split. They are the evidence for the claim in §III-B.3 that
+held-out test split. They are the evidence for the claim in §III-A.1.b that
 in-distribution detection is near-degenerate, and therefore that the
 out-of-distribution results are the informative ones.
 
@@ -1593,7 +1593,7 @@ intervals, the counterpart of Fig.~\ref{fig:detood}.}
 {\footnotesize (a) deception} & {\footnotesize (b) high-stakes} & {\footnotesize (c) sycophancy} \\
 \end{tabular}
 \caption{In-distribution ROC curves, all five probe cells per behaviour, on the held-out test
-split. These are the curves §III-B.3 calls near-degenerate: the deception panel in particular hugs
+split. These are the curves §III-A.1.b calls near-degenerate: the deception panel in particular hugs
 the top-left corner, where the area carries nothing the scalar in Appendix~\ref{app:det-tables}
 does not. Near the ceiling the cells are also coincident, so the last-drawn probe covers the
 others and per-probe values must be read from the legend. The out-of-distribution curves, where
@@ -1603,7 +1603,7 @@ the cells separate, are in Fig.~\ref{fig:roc}.}
 
 \section{Out-of-Distribution ROC Curves}\label{app:roc-ood}
 Held-out out-of-distribution curves for all five probes per behaviour; these are the
-curves the read-side comparison rests on (§III-B.3).
+curves the read-side comparison rests on (§III-A.1.b).
 
 \begin{figure}[H]
 \centering
@@ -1632,7 +1632,7 @@ results are in Appendix~\ref{app:roc-id}.}
 \figslot{deception/heatmap_deceptive.png}{0.9\textwidth}{1.6cm}\\[3pt]
 \figslot{deception/heatmap_honest.png}{0.9\textwidth}{1.6cm}
 \caption{\textbf{Per-token probe scores, one deception pair:} deceptive persona (top), honest twin
-(bottom) --- the mask of §III-B made visible, since only assistant-content tokens are scored.
+(bottom) --- the mask of §III-A made visible, since only assistant-content tokens are scored.
 \emph{Why a pair rather than one example.} The two members share an identical user turn and the same
 truncated fact, differing only in the system persona, so any difference in colour is the probe reading
 \emph{context} rather than lexical content. \emph{What to look for.} Where the score rises: early,
