@@ -210,7 +210,7 @@ steer text directly.
 %=======================================================================
 \section{Introduction}
 
-As Large Language Model (LLM) capabilities advance and they are deployed in increasingly
+As Large Language Model (LLM) capabilities advance and models are deployed in increasingly
 consequential settings, the need to monitor their internal state grows.
 Their outputs cannot be taken at face value, as reasoning models' stated
 chains of thought are not always faithful to their internal reasoning
@@ -293,7 +293,7 @@ dissociation: the direction a logistic regression classifier learns is measurabl
 than the difference of the class means.
 
 \citet[§6]{marks2024} continue this study of eliciting truth, intervening on a
-small set of causally-implicated hidden states, comparing logistic regression, mass-mean, and CCS, evaluating with a normalised indirect effect (NIE) on the model's own readout
+small set of causally implicated hidden states, comparing logistic regression, mass-mean, and CCS, evaluating with a normalised indirect effect (NIE) on the model's own readout
 --- and, ``in contrast to prior work'', on out-of-distribution inputs. They
 find the mass-mean direction the most causally implicated, the better steerer. Our primary causal
 metric, its calibration, and steering logic are taken from them.
@@ -443,25 +443,25 @@ within-pair activation difference ``should represent the model's `intent' to
 complete the fact deceptively'' \citep[§3.2.1]{goldowsky2025}.
 
 \paragraph{Evaluation Data}
-In-distribution accuracy cannot distinguish a probe that has learned the
-behaviour from one that has latched onto a feature merely correlated with the
-label in its training data \citep{levinstein2024,marks2024}, so our
+In-distribution performance cannot distinguish a probe that has truly \emph{learned} the
+behaviour from one that has merely learned features \emph{correlated} with
+it in its training data \citep{levinstein2024,marks2024}, so our
 conclusions rest on the OOD sets.
 
 \textbf{AI Liar} (\citealt{pacchiardi2024}; 54 examples). A system prompt
-gives a scenario in which the assistant has a goal and a situation, followed
-by a human question. Each of the 27 scenarios yields one honest and one
+lays out a scenario in which the assistant has a certain goal. It is followed
+by a user question. Each of the 27 scenarios yields one honest and one
 deceptive example, and the only thing that makes it deceptive is the
-information given about the situation in the system prompt --- the question and the assistant's
+information given about the situation in the system prompt --- the user question and the assistant's
 answer are byte-identical across the two (Fig.~\ref{fig:oodpairs}a). Deception
-here is \emph{context-defined}. Only assistant-response tokens are eligible to
+here is also \emph{context-defined}. Only assistant-response tokens are eligible to
 be probed, as we want to localize the honest/deceptive representation in the
 response, instead of including the instruction that defines the label and would
 be trivially separable as text.
 
 \textbf{Roleplaying} (\citealt{goldowsky2025}; 742 examples). AI Liar's 54
-examples are lower than than every other evaluation set we
-use, so we add Roleplaying. Each of 371 scenarios cast the model as
+examples are lower than every other evaluation set we
+use, so we add Roleplaying. Each of 371 scenarios casts the model as
 a character with an incentive to lie in the \emph{system prompt}, has the \emph{user} ask a question relevant to the incentive,
 and pairs an honest with a deceptive \emph{assistant} completion. The scenario and question are shared; only the answer differs, so
 it is \emph{content-defined} where AI Liar is
@@ -473,11 +473,7 @@ tokens are eligible to be probed.
 \paragraph{Training Data}
 The training data for our high-stakes probes reuses the Models Under Pressure
 dataset provided by \citet{mckenzie2025}. It is built from GPT-4o-generated
-pairs of low- and high-stakes situations. The rows descended from one situation
-pair form a ``pair group'', and within each group are variants across tones,
-lengths, languages, and styles, to help with generalization. Each variant is a
-new row in the dataset. This is a dataset of 8,000 rows, which we split by pair
-group so that variants of one scenario never straddle the split, and subsample
+pairs of low- and high-stakes situations. We subsample
 1,500 examples per class, with 500 per class held out for test. Each scenario
 is a single user turn, and all its content tokens are in the detection mask
 (Fig.~\ref{fig:masks}b). One difference
@@ -490,8 +486,8 @@ scaffold is byte-identical across classes and was diluting the pooled signal
 \textbf{Anthropic-HH} (\citealt{bai2022}; 2,984 examples). We reuse one of
 \citeauthor{mckenzie2025}'s (\citeyear{mckenzie2025}) evaluation sets: real multi-turn human--assistant
 conversations, labelled low or high stakes by GPT-4o. This is genuinely OOD
-against the training set's synthetic single-turn user prompts. Each example is
-a common system prompt followed by a series of user and assistant turns
+against the training set's synthetic single-turn user prompts. Each example consists of
+a standard system prompt followed by a series of user and assistant turns
 (Fig.~\ref{fig:hsood}), and tokens from all three
 roles are in the detection mask, unlike deception's assistant-only, as high
 stakes is a property of the situation, not of one turn, and any speaker can
@@ -500,9 +496,9 @@ turn the conversation high-stakes. The template scaffold is excluded as before.
 \subsubsection{Sycophancy}
 
 \paragraph{Training Data}
-The training data for our sycophancy probes reuses the factorial datasets of
+The training data for our sycophancy probes reuses the datasets of
 \citet{cincynlp2025}. Each example consists of
-a user turn and an assistant response. The user turn is a professor in the
+a user turn and an assistant response (Fig.~\ref{fig:masks}c). The user turn consists of a professor in the
 relevant domain asserting a belief and asking the assistant what it believes.
 The underlying facts are adapted from the true/false
 statement sets of \citet{marks2024}, and cover four domains: cities,
@@ -513,7 +509,7 @@ right and agreeing is honest (29\% of our negatives). These read exactly like
 sycophancy, so a probe that has only learned agreement scores them wrong. We subsample to 
 1,368 examples per class for training, with 347 per class held out for test.
 Only the assistant's reply is included in the detection mask, as sycophancy is
-only present in the reply (Fig.~\ref{fig:masks}c).
+only present in a reply.
 
 \paragraph{Evaluation Data}
 \textbf{Math} (\citealt{cincynlp2025}; 1,000 examples). This is the fifth
