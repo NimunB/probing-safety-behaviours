@@ -267,7 +267,7 @@ image recognition classes.
 truthfulness, training classifiers on hidden activations to predict whether a
 statement is true. \citet{levinstein2024} showed such probes fail to
 generalise in elementary ways, like to negations --- failures which,
-as \citet{marks2024} put it, suggest the probes `may be identifying not truth,
+as \citet[§1]{marks2024} put it, suggest the probes `may be identifying not truth,
 but other features that correlate with truth on their training data'. That
 critique informs this study's decision to prioritize out-of-distribution transfer over in-distribution
 performance.
@@ -292,7 +292,7 @@ Mass-mean steering wins decisively. This is the earliest form of the read/write
 dissociation: the direction a logistic regression classifier learns is measurably worse at steering
 than the difference of the class means.
 
-\citet{marks2024} continue this study of eliciting truth, intervening on a
+\citet[§6]{marks2024} continue this study of eliciting truth, intervening on a
 small set of causally-implicated hidden states, comparing logistic regression, mass-mean, and CCS, evaluating with a normalised indirect effect (NIE) on the model's own readout
 --- and, ``in contrast to prior work'', on out-of-distribution inputs. They
 find the mass-mean direction the most causally implicated, the better steerer. Our primary causal
@@ -318,7 +318,7 @@ unrelated to deception, with performance being relatively similar for
 distinguishing deceptive and honest responses.
 
 \paragraph{High Stakes Awareness}
-\citeauthor{mckenzie2025}'s probes detect high-stakes interactions ---
+\citeauthor{mckenzie2025}'s (\citeyear{mckenzie2025}) probes detect high-stakes interactions ---
 contexts where an LLM's actions could carry substantial real-world
 consequences, such as giving investment advice. They exclusively use the
 logistic regression probe, but study the effects of different token pooling
@@ -440,7 +440,7 @@ response is included in the detection mask and is eligible to be probed (Fig.~\r
 prompt contains the behavioural label (honest/deceptive) which would make
 detection trivial based on lexical clues. The pair is \emph{context-defined}, as nothing but the system prompt framing differs. The
 within-pair activation difference ``should represent the model's `intent' to
-complete the fact deceptively'' \citep{goldowsky2025}.
+complete the fact deceptively'' \citep[§3.2.1]{goldowsky2025}.
 
 \paragraph{Evaluation Data}
 In-distribution accuracy cannot distinguish a probe that has learned the
@@ -488,7 +488,7 @@ scaffold is byte-identical across classes and was diluting the pooled signal
 
 \paragraph{Evaluation Data}
 \textbf{Anthropic-HH} (\citealt{bai2022}; 2,984 examples). We reuse one of
-\citeauthor{mckenzie2025}'s evaluation sets: real multi-turn human--assistant
+\citeauthor{mckenzie2025}'s (\citeyear{mckenzie2025}) evaluation sets: real multi-turn human--assistant
 conversations, labelled low or high stakes by GPT-4o. This is genuinely OOD
 against the training set's synthetic single-turn user prompts. Each example is
 a common system prompt followed by a series of user and assistant turns
@@ -578,7 +578,7 @@ every probe are listed in Appendix~\ref{app:hyperparams}.
 
 \paragraph{Last-token Pooling}
 The activation of the sample is taken exclusively from the last token in the
-detection mask. \citeauthor{marks2024}'s work also probes a single token, the
+detection mask. \citeauthor{marks2024}'s (\citeyear{marks2024}) work also probes a single token, the
 end-of-sentence punctuation \citep{marks2024}.
 
 \paragraph{Mean Pooling}
@@ -624,7 +624,7 @@ three: MM (mean), LR (mean), and LR-attention. The
 last-token variants are left out because steering writes to every token
 position while their direction is measured at a single one, and because
 last-token pooling underperforms mean and attention both in
-\citeauthor{mckenzie2025}'s benchmark and in our own grid. The three probe directions
+\citeauthor{mckenzie2025}'s (\citeyear{mckenzie2025}) benchmark and in our own grid. The three probe directions
 have arbitrary, different lengths, so adding them at the
 same coefficient would push the model by different amounts.
 We therefore calibrate each direction so that
@@ -640,7 +640,7 @@ activation space.
 At the block chosen in §\ref{sec:methodology}-D.2, each layer receives its own
 direction: MM and LR are refit from that layer's pooled activations, and the
 attention head is retrained at that layer (three seeds, as in
-§\ref{sec:methodology}-B.2). This differs from \citeauthor{marks2024}, who
+§\ref{sec:methodology}-B.2). This differs from \citet{marks2024}, who
 use a single vector across their intervention layers. \citet{vanderweij2024} find
 separate per-layer vectors promising where a single summed vector is not.
 
@@ -689,7 +689,7 @@ We employ two separate independent instruments, which are measured at every
 disagree.
 
 The primary metric is the \textbf{normalised indirect effect} (NIE), which reproduces
-\citeauthor{marks2024}'s causal metric with YES/NO substituted for TRUE/FALSE.
+\citeauthor{marks2024}'s (\citeyear{marks2024}) causal metric with YES/NO substituted for TRUE/FALSE.
 The model reads a few-shot prompt, ending in a question about whether a
 behaviour is present in an off-behaviour transcript, and
 $PD = P(\textsc{yes}) - P(\textsc{no})$ is read at the final position (no text
@@ -744,7 +744,7 @@ whole item is steered, prompt and completion alike.}
 
 An \textbf{LLM judge} (Claude Haiku 4.5) then scores each generation 1--10 on how
 strongly the assistant response exhibits the target behaviour, following
-\citeauthor{rimsky2024}'s scoring instruction, and separately on coherence
+\citeauthor{rimsky2024}'s (\citeyear{rimsky2024}) scoring instruction, and separately on coherence
 (prompts are shown in Appendix~\ref{app:judge}).
 
 Each (direction, coefficient) averages the scores from 24 generations (CAA use 50), drawn from off-behaviour prompts.
@@ -779,7 +779,7 @@ The readout runs on behaviour-off training-split
 transcripts, and we select the contiguous five-layer window with the highest summed NIE. We
 steer a block rather than a single layer like in detection because the causal
 effect is spread across neighbouring layers rather than concentrated at one
-(Fig.~\ref{fig:nie-syc}), and \citeauthor{marks2024} likewise intervene on
+(Fig.~\ref{fig:nie-syc}), and \citet{marks2024} likewise intervene on
 their whole causally implicated group of hidden states, not a single site.
 Anchoring the sweep on mass-mean is a disclosed mild bias toward it in the
 later comparison, accepted because one shared block keeps the three directions
@@ -824,7 +824,7 @@ The detection layer is chosen to be layer 12 of the 32 in Llama-3.1-8B
 (Fig.~\ref{fig:cv-dec}). The cross-validated AUROC is near ceiling
 ($\geq 0.996$) from layers 11 to 20, with layers 12 and 13 exactly at 1.000.
 At 37.5\% depth, layer 12 is early-to-mid --- consistent with
-\citeauthor{marks2024}'s finding that linear structure for truth emerges in
+\citeauthor{marks2024}'s (\citeyear{marks2024}) finding that linear structure for truth emerges in
 the early-middle layers, and comparable to Apollo's deception layer at 22 of
 80 (27.5\%) on Llama-3.3-70B.
 
@@ -849,7 +849,7 @@ the training distribution.
 
 On Llama-3.3-70B, Apollo's logistic-regression probe holds 0.964 on
 Roleplaying, where we fall to 0.706. Scale is a plausible explanation:
-\citeauthor{marks2024} find that linear structure for truth emerges more
+\citet{marks2024} find that linear structure for truth emerges more
 clearly as models grow.
 
 \subsubsection{Steering}
@@ -879,7 +879,7 @@ $6.7$ --- so a shift in the model's self-report (NIE) does not transfer
 into elicited behaviour. Coherence moves more than behaviour and degrades
 at the extremes: mass-mean peaks at $+1$ on AI Liar ($8.71$, against
 $7.04$ at $+2$) and falls to $2.96$ and $4.12$ at $\pm 2$ on Roleplaying,
-with higher values in the centre, matching \citeauthor{rimsky2024}'s
+with higher values in the centre, matching \citeauthor{rimsky2024}'s (\citeyear{rimsky2024})
 finding that large multipliers degrade text quality.
 
 
@@ -907,14 +907,14 @@ cross-validated AUROC of 0.949 --- 62.5\% depth, later than deception's
 probed: high-stakes training samples (Models Under Pressure) are user
 prompts describing an entire situation, not one-off statements like
 deception and sycophancy --- a median of 58 probed tokens, against six for
-deception. \citeauthor{marks2024} observe that linear structure emerges
+deception. \citet{marks2024} observe that linear structure emerges
 later for more structurally complex statements.
 
-\citeauthor{mckenzie2025} selected layer 31 of 80 on their 70B model
+\citet{mckenzie2025} selected layer 31 of 80 on their 70B model
 (38.75\% depth), using cross-validated \emph{accuracy} of a mean-pooled
 logistic probe on the same training data, where we use AUROC of MM (mean).
 Potentially the larger model develops its internal understanding of the
-situation earlier: \citeauthor{marks2024} find that linear representations
+situation earlier: \citet{marks2024} find that linear representations
 of truth strengthen with scale.
 
 The steering block is layers 6--10 (Fig.~\ref{fig:nie-hs}). Interestingly,
@@ -930,13 +930,13 @@ On OOD (Anthropic-HH), every probe falls by 0.20--0.28
 (Fig.~\ref{fig:detood}). LR (mean) leads at 0.774, followed by LR-attention
 at 0.755 and MM (mean) at 0.737 --- the three probes that consider every
 token; the two last-token probes come last at 0.687 and 0.686. This matches
-\citeauthor{mckenzie2025}, whose strongest probes (Attention, Softmax,
+\citet[§3]{mckenzie2025}, whose strongest probes (Attention, Softmax,
 Mean) all take every token into account --- labelling an interaction as
 high-stakes ``often depends on every token of the conversation to provide
 the necessary context'' --- and whose last-token probe ``consistently
 performs poorly''.
 
-On their 70B model, \citeauthor{mckenzie2025}'s attention probe reaches
+On their 70B model, \citeauthor{mckenzie2025}'s (\citeyear{mckenzie2025}) attention probe reaches
 approximately 0.96 on Anthropic-HH, where ours reaches 0.755 ---
 potentially a scale effect again.
 
@@ -968,7 +968,7 @@ despite the training samples being one-off statements again. A possible
 reason is that the label is relational, not lexical: 29\% of the training
 negatives are genuine agreements, so the probe cannot read agreement alone
 --- it must combine the reply's stance with the truth of the user's claim.
-\citeauthor{cincynlp2025} likewise find that sycophantic and genuine
+\citet{cincynlp2025} likewise find that sycophantic and genuine
 agreement only separate representationally around mid-network depth.
 
 The steering block is layers 6--10 (Fig.~\ref{fig:nie-syc}). Like
@@ -991,7 +991,7 @@ Mean pooling dilutes that signal over the shared template. LR-attention
 stays competitive because it can learn where to look: in the example of
 Fig.~\ref{fig:app-attn}, it puts 0.38 of its pooling mass on the echoed
 answer token. Our last token is the reply's closing punctuation, one
-position after the answer word --- the site \citeauthor{marks2024} probe,
+position after the answer word --- the site \citet{marks2024} probe,
 noting that the final word's own representation can be dominated by the
 token's identity.
 
@@ -1026,7 +1026,7 @@ logistic regression's stays flat near $8$ on both.
 \textbf{The read/write dissociation holds for two behaviours and inverts for
 the third.} For deception and high-stakes, logistic regression (LR (mean)) detects best out of
 distribution andthe mass-mean direction (MM (mean)) steers best by the readout, reproducing the
-pattern \citeauthor{marks2024} report. Their reading result
+pattern \citet{marks2024} report. Their reading result
 predicts ours: mass-mean underperforms logistic regression on 7B models
 and only matches it at larger scale. Their writing result, shared with ITI
 \citep{li2023}, is that the mass-mean direction steers better. Sycophancy
@@ -1037,7 +1037,7 @@ pooling paragraph below suggests it depends on the data instead.
 \textbf{The best pooling strategy depends on the behaviour and the data.}
 Whether an interaction is high-stakes depends on the whole situation, so
 the evidence is spread across the text and the every-token probes win on
-both sets, as \citeauthor{mckenzie2025} also find. Our sycophancy replies
+both sets, as \citet{mckenzie2025} also find. Our sycophancy replies
 follow a template that differs only in the final answer, so the
 difference sits at the end and the last-token probes win. This data
 difference might also explain why, for sycophancy alone, LR-attention
@@ -1055,7 +1055,7 @@ complex.} Deception is read best at layer 12, sycophancy at 19 and
 high-stakes at 20, and the order follows what the probe has to learn: a
 single contrast in the persona for deception, the reply's stance combined
 with the truth of the claim for sycophancy, and an entire situation for
-high-stakes. \citeauthor{marks2024} observe that linear structure emerges
+high-stakes. \citet[§4]{marks2024} observe that linear structure emerges
 ``later for datasets of more structurally complex statements'', and the
 ordering here is indicative of that pattern.
 
@@ -1067,7 +1067,7 @@ the two coincide only for deception. One reading is that the behaviour is
 processing, and becomes \emph{legible} later.
 
 \textbf{Detection is higher in distribution than out, and the more similar
-the held-out data, the smaller the gap.} \citeauthor{marks2024} warn that
+the held-out data, the smaller the gap.} \citet[§1]{marks2024} warn that
 probes may identify ``not truth, but other features that correlate with
 truth on their training data'', and evaluate across datasets for that
 reason. The same concern explains the pattern here: all three behaviours
@@ -1078,11 +1078,11 @@ the need for evaluation sets as dissimilar from training as the
 deployment setting, rather than held-out splits of the same data.
 
 \textbf{Our probes score below the reference papers' on the shared sets,
-most plausibly because of scale.} Apollo and \citeauthor{mckenzie2025}
+most plausibly because of scale.} Apollo and \citet{mckenzie2025}
 report higher AUROCs on Roleplaying and Anthropic-HH with 70B models than
 we reach with 8B (\S\ref{sec:results}). This is consistent with
-\citeauthor{marks2024}'s evidence that ``linear representations of truth
-emerge with scale'', and \citeauthor{mckenzie2025} measure the effect
+\citeauthor{marks2024}'s (\citeyear{marks2024}, §1) evidence that ``linear representations of truth
+emerge with scale'', and \citet{mckenzie2025} measure the effect
 directly: the same probe scores 0.887, 0.913 and 0.916 on 8B, 27B and 70B
 models. 
 
@@ -1099,7 +1099,7 @@ elicited behaviour.
 is an inverted U: judged coherence is high at small magnitude coefficients and
 collapses toward both extremes. Roleplaying and math show it most clearly,
 for mass-mean on both and for logistic regression and attention
-respectively. \citeauthor{rimsky2024} find the same, that ``steering with
+respectively. \citet[§4.2]{rimsky2024} find the same, that ``steering with
 larger multipliers results in a degradation in the quality of the
 open-ended text'', and limit their multiplier range for that reason.
 
@@ -1142,7 +1142,7 @@ comparison.
 \textbf{Steering in the other direction.} Everything here steers
 behaviour-off items toward the behaviour. The safety application runs the
 other way, suppressing a behaviour the model is exhibiting, and
-\citeauthor{marks2024} find the two directions of the same intervention
+\citet{marks2024} find the two directions of the same intervention
 can diverge. Suppression needs its own evaluation, with behaviour-on items
 steered and the readout run in reverse.
 
@@ -1218,17 +1218,13 @@ Cunningham, H., Ewart, A., Riggs, L., Huben, R. and Sharkey, L. (2023) `Sparse
 autoencoders find highly interpretable features in language models',
 \textit{arXiv preprint} arXiv:2309.08600.
 
-\bibitem[Elhage et al.(2022)]{elhage2022}
-Elhage, N., Hume, T., Olsson, C., et al. (2022) `Toy models of superposition',
-\textit{Transformer Circuits Thread}.
-
 \bibitem[Goldowsky-Dill et al.(2025)]{goldowsky2025}
 Goldowsky-Dill, N., Chughtai, B., Heimersheim, S. and Hobbhahn, M. (2025)
 `Detecting strategic deception using linear probes', \textit{arXiv preprint}
 arXiv:2502.03407.
 
 \bibitem[Kantamneni et al.(2025)]{kantamneni2025}
-Kantamneni, S., Engels, J., Rajamanoharan, S. and Nanda, N. (2025) `Are sparse
+Kantamneni, S., Engels, J., Rajamanoharan, S., Tegmark, M. and Nanda, N. (2025) `Are sparse
 autoencoders useful? A case study in sparse probing', \textit{arXiv preprint}
 arXiv:2502.16681.
 
