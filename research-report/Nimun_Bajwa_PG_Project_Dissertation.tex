@@ -513,40 +513,37 @@ only present in a reply.
 
 \paragraph{Evaluation Data}
 \textbf{Math} (\citealt{cincynlp2025}; 1,000 examples). This is the fifth
-factorial domain provided by \citeauthor{cincynlp2025}, which we use as our OOD set, as it is a
+domain provided by \citeauthor{cincynlp2025}, which we use as our OOD set, as it is a
 domain shift. Otherwise, examples have the same construction, label mapping,
-and detection mask (e.g.\ ``I believe $18 - 12 = 5$''; Fig.~\ref{fig:sycood}). We subsample 500 from each class (sycophantic/candid)
-from a usable pool of 3,000 replies, 1,000 sycophantic and 2,000 candid. The
-set tests whether the probe has learned deference to the user rather than the
-content of any one domain.
+and detection mask (e.g.\ ``I believe $18 - 12 = 5$''; Fig.~\ref{fig:sycood}). We subsample 500 from each class (sycophantic/candid).
 
 \subsection{Probing}
 \label{sec:detection}
 
 We define a probe as an estimator crossed with a pooling strategy. Crossing our
-two estimators, mass-mean (MM) and logistic regression (LR), with the relevant
+two estimators, mass-mean (MM) --- the difference-of-means direction --- and logistic
+regression (LR), with the relevant
 pooling strategies gives the following probes: MM (last),
 MM (mean), LR (last), LR (mean), and
 LR-attention. All probes are fitted on masked activations at the
 detection layer chosen in §\ref{sec:methodology}-D.
 
 \subsubsection{Estimator}
-The estimator determines a direction pointing from the behaviour being off to
-on. Both estimators project an example's activation onto that direction to get
-its score, and differ only in how the direction is fitted.
+The estimator determines a direction pointing from behaviour-off to behaviour-on in activation space.
+Both estimators project an example's activation onto that direction to get
+its score, and differ only in how the direction is computed.
 
 \paragraph{Logistic Regression}
 Logistic regression learns a separating boundary between behaviour-on and
-behaviour-off examples. The direction vector we save is the weight vector normal
-to that boundary. We fit it with $L_2$ regularisation ($\lambda = 10$) on
+behaviour-off examples in activation space. The direction vector we save is the weight vector normal
+to that boundary (pointing towards the behaviour). We fit it with $L_2$ regularisation ($\lambda = 10$) on
 normalized activations (zero-mean, unit variance), reproducing Apollo's
-hyperparameters exactly \citep{goldowsky2025}, and fit no intercept, so
-zero is the probe's own boundary. When evaluating new samples, we apply the same
+hyperparameters exactly \citep{goldowsky2025}. When evaluating new samples, we apply the same
 normalization and project the activations onto the probe direction to get a
 real-valued behavioural score for each probed token.
 
 \paragraph{Mass-Mean}
-Mass-mean requires no fitting and is closed form: the direction is the vector
+Computing the mass-mean direction requires no learning and is closed form: the direction is the vector
 pointing from the mean of the behaviour-off class to the mean of the
 behaviour-on class,
 \begin{equation}
@@ -554,45 +551,33 @@ behaviour-on class,
 \label{eq:mm}
 \end{equation}
 where $\boldsymbol{\mu}^{+}$ and $\boldsymbol{\mu}^{-}$ are the means of the
-behaviour-on- and behaviour-off-labelled activations, and an example is scored
-by the projection $\boldsymbol{\theta}_{\mathrm{mm}}^{\top}\mathbf{x}$. It was
-introduced as a steering direction by \citet{li2023} and used the same way by
-CAA \citep{rimsky2024}, then repurposed as a probing classifier by
-\citet{marks2024}. On paired data (Fig.~\ref{fig:masks}) the differencing
-cancels whatever the pair shares, isolating the behaviour. We use plain
-$\boldsymbol{\theta}_{\mathrm{mm}}$ rather than the covariance-corrected variant
-$\Sigma^{-1}\boldsymbol{\theta}_{\mathrm{mm}}$ \citep{marks2024}, as
-they report the plain direction to be the one that transfers
-out of distribution, which is what we prioritise.
+behaviour-on and behaviour-off activations, and an example is scored
+by the projection $\boldsymbol{\theta}_{\mathrm{mm}}^{\top}\mathbf{x}$.
+On paired data (Fig.~\ref{fig:masks}) the differencing
+cancels whatever the pair shares, isolating the behaviour.
 
 \subsubsection{Pooling Strategies}
 The estimators score a single activation vector, so another design decision is
 how to pool (aggregate) the activations of every token in the detection mask
-into one. Each of the three strategies below is taken or adapted from the
-aggregation schemes benchmarked by \citet{mckenzie2025}. Hyperparameters for
+into one. Hyperparameters for
 every probe are listed in Appendix~\ref{app:hyperparams}.
 
 \paragraph{Last-token Pooling}
 The activation of the sample is taken exclusively from the last token in the
-detection mask. \citeauthor{marks2024}'s (\citeyear{marks2024}) work also probes a single token, the
-end-of-sentence punctuation \citep{marks2024}.
+detection mask.
 
 \paragraph{Mean Pooling}
-The literature contains two versions of this pooling scheme: average the
-activations, then score \citep{mckenzie2025}, or score every token, then average
-\citep{goldowsky2025}. For a linear probe the two are identical at evaluation;
-they differ only in training, where the first gives one training row per example
-and the second one row per token. We reproduce the Apollo way, making per-token
-score heatmaps meaningful.
+This pooling scheme involves scoring every token, and then averaging the scores
+\citep{goldowsky2025}. This allows for per-token
+score heatmaps (Appendix~\ref{app:tokens}).
 
 \paragraph{Attention Pooling}
 The attention probe \citep{mckenzie2025} learns its pooling instead of fixing
 it: a trained query vector scores each token in the detection mask, a softmax
 turns the scores into weights, and a trained linear head classifies the
 weighted average. The pooling is learned jointly with the logistic-regression
-estimator. Following \citeauthor{mckenzie2025}'s protocol it is trained with
-AdamW over three seeds, ensembling by averaging their scores, while also
-reporting the individual performances to check training stability. When this
+estimator. Following \citeauthor{mckenzie2025}, we train three seeds and average their scores (Appendix~\ref{app:hyperparams}).
+When this
 probe is steered (§\ref{sec:steering}), the injected direction is the head's
 weight vector, averaged over the three seeds.
 
@@ -603,25 +588,24 @@ probing. AUROC is the probability that the probe gives a randomly chosen
 behaviour-on example a higher score than a randomly chosen behaviour-off one,
 so it measures only the ordering of scores, never their absolute values. As
 \citet{mckenzie2025} argue, the ranking is what matters in a monitoring
-context. Both Apollo and \citeauthor{mckenzie2025} lead with AUROC for their
-probes. Accuracy, by contrast, requires a threshold fixed on training data
-(what probe score constitutes on-behaviour), and no threshold is comparable
-across estimators, since logistic regression is centred at zero by construction
-while mass-mean's raw projection is not.
+context. Accuracy, by contrast, requires a fixed threshold (what probe score 
+constitutes on-behaviour), and no threshold is comparable across 
+estimators — logistic regression is centred at zero, 
+mass-mean's raw projection is not — or between ID and OOD data.
 
 \subsection{Steering}
 \label{sec:steering}
 
-Probing allows us to find a direction from off- to on-behaviour, and use it to
+Probing allows us to find a direction from off-behaviour to on-behaviour, and use it to
 score an interaction with the model. Steering involves adding that direction to
 the residual stream of selected layers and tokens during the forward pass.
-Of the five probes we steer
+Of the five probes used for detection, we steer
 three: MM (mean), LR (mean), and LR-attention. The
 last-token variants are left out because steering writes to every token
 position while their direction is measured at a single one, and because
 last-token pooling underperforms mean and attention both in
-\citeauthor{mckenzie2025}'s (\citeyear{mckenzie2025}) benchmark and in our own grid. The three probe directions
-have arbitrary, different lengths, so adding them at the
+\citeauthor{mckenzie2025}'s (\citeyear{mckenzie2025}) benchmark. The three probe directions
+have different lengths, so adding them at the
 same coefficient would push the model by different amounts.
 We therefore calibrate each direction so that
 coefficient $+1$ moves the average off-behaviour activation exactly onto the
@@ -1588,9 +1572,7 @@ detection mask.}
 
 \section{Probe Hyperparameters}\label{app:hyperparams}
 Table~\ref{tab:hyperparams} lists the training settings for every probe cell. Mass-mean is closed
-form and has no hyperparameters. The attention recipe follows the teaching notebook this pipeline
-evolved from \citep{arena2024} rather than \citet{mckenzie2025}, who add a learning-rate schedule
-and early stopping; optimizer, epochs and starting learning rate coincide.
+form and has no hyperparameters.
 
 \begin{table}[H]
 \centering
