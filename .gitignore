@@ -44,3 +44,7 @@ __pycache__/
 venv/
 *.egg-info/
 .pytest_cache/
+
+# presentation working files (local only)
+presentation-assets/
+presentation-plan.md
