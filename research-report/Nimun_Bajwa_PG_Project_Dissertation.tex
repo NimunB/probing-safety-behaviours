@@ -1668,11 +1668,12 @@ a robustness check. Error bars span the five folds; the dashed line marks the ch
 \end{figure}
 
 \section{In-Distribution Detection}\label{app:roc-id}
-Figs.~\ref{fig:detid} and \ref{fig:roc-id} are the in-distribution
-counterparts of Figs.~\ref{fig:detood} and \ref{fig:roc}, on each behaviour's
-held-out test split. It shows AUROC with bootstrap 95\% confidence intervals for all five probes
-on each behaviour's held-out test split (Fig.~\ref{fig:detid}), and the corresponding ROC curves
-(Fig.~\ref{fig:roc-id}). Exact values are the test (ID) rows of Appendix~\ref{app:det-tables}.
+The in-distribution counterparts of Figs.~\ref{fig:detood} and
+\ref{fig:roc}: AUROC with bootstrap 95\% confidence intervals
+(Fig.~\ref{fig:detid}) and the corresponding ROC curves
+(Fig.~\ref{fig:roc-id}), for all five probes on each behaviour's held-out
+test split. Exact values are the test (ID) rows of
+Appendix~\ref{app:det-tables}.
 
 \begin{figure}[H]
 \centering
@@ -1771,9 +1772,7 @@ detection layer: deception (left), high-stakes (centre), sycophancy (right).}
 Two views of the same mean-pooled training activations at the detection layer, asking where the
 two classes separate. The left panel plots each example on the two directions of largest variance
 (PCA), computed without seeing the labels; the right panel plots the same examples along the
-direction the mass-mean probe learned from the labels. Separation on the left would mean the
-behaviour is one of the biggest sources of variation; separation only on the right means it is a
-small direction a probe must be trained to find.
+direction the mass-mean probe learned from the labels.
 
 % One logical figure; the first panels flow in a breakable centered block so they can
 % share the page with the section description, and the caption rides with the last panel.
@@ -1872,17 +1871,14 @@ soften the truth to please the user.}
 
 \input{appendix_steering_tables}
 
+% layout: keep appendix title with its figure
+\clearpage
 \section{In-Distribution Steering}\label{app:steer-id}
-In the appendix rather than the body for two independent reasons. Steering blocks were selected to
-maximise NIE on training transcripts, so these values are closer to fitted than held-out. And
-deception's in-distribution readout gap is small: the fact is true under both personas, so the
-model answers ``NO'' to the deception question for \emph{both} classes ($PD^{+}=-0.906$,
-$PD^{-}=-0.964$), leaving a class gap of $0.058$ and NIE magnitudes that are not comparable with
-the held-out sets. Deception's judge columns are empty for a separate reason: its in-distribution
-generation prompts are byte-identical under greedy decoding, so the judge would score one
-generation repeatedly. Read these panels for whether the direction \emph{ordering} matches the
-out-of-distribution ones (Fig.~\ref{fig:steer}), not for magnitudes. Exact per-coefficient
-values are in Appendix~\ref{app:steer-tables}.
+In-distribution steering for each behaviour, on its held-out test split.
+Deception's judge rows are absent: its generation prompts are
+byte-identical under greedy decoding, so the judge would score one
+generation repeatedly. Exact per-coefficient values are in
+Appendix~\ref{app:steer-tables}.
 
 \begin{figure}[H]
 \centering
@@ -1902,20 +1898,14 @@ behaviour, judge coherence.}
 \section{The Interface in Use}
 \label{app:ui-shots}
 
-Figs.~\ref{fig:ui} and \ref{fig:ui-steer} show the detection and steering tabs;
-Figs.~\ref{fig:ui-multi} and \ref{fig:ui-multi2} the multi-behaviour mode. All are live generations
-on free input, far from any evaluation set, with the same calibrated directions the results sections
-report, each behaviour's directions applied at its own steering block, following
-\citet{vanderweij2024} for composition. The two multi-behaviour examples bracket what composition
-can do. In Fig.~\ref{fig:ui-multi}, the unsteered model declines to endorse swimming the Channel
-without a life vest; steered, it caves into stumbling enthusiasm for the dangerous plan --- the
-sycophantic caving of §IV-C composed with deception, on out-of-distribution input. In
-Fig.~\ref{fig:ui-multi2}, at higher combined coefficients the steered generation collapses into
-alarmist non-sequitur (``I can't help but say that the sky is falling.'') where the baseline
-suggests cuisines --- the degradation the coherence axis quantifies, reproduced interactively; the
-two multiplier sliders make the coherence cliff something a user can find by feel. The in-app
-banner marks the mode exploratory: how directions compose is an open question the pipeline does
-not yet evaluate.
+A FastAPI application built on the exported probe bundles
+(\S\ref{sec:impl}), computing every score and generation live: a detection
+tab (Fig.~\ref{fig:ui}), a steering tab (Fig.~\ref{fig:ui-steer}), and a
+multi-behaviour tab (Figs.~\ref{fig:ui-multi} and \ref{fig:ui-multi2})
+that composes two directions at separate blocks, following
+\citet{vanderweij2024}. All screenshots are live runs on free input. The
+pipeline does not evaluate composition, and the app marks that mode
+exploratory.
 
 \begin{figure}[H]
 \centering
@@ -1923,14 +1913,16 @@ not yet evaluate.
 \centering
 \figslot{ui/probing/sycophancy.png}{\linewidth}{2.0cm}
 \caption{The detection tab: per-token probe scores on a sycophantic exchange,
-red toward sycophantic, blue toward candid.}
+red toward sycophantic, blue toward candid. The score concentrates on
+``Yes, of course''.}
 \label{fig:ui}
 \end{minipage}\hfill
 \begin{minipage}[t]{0.49\textwidth}
 \centering
 \figslot{ui/high-stakes.png}{\linewidth}{1.6cm}
 \caption{The steering tab: the same prompt generated with and without the
-high-stakes direction applied.}
+high-stakes direction applied. Steered, an ordinary message about taking a
+holiday is answered as a life-threatening emergency.}
 \label{fig:ui-steer}
 \end{minipage}
 \end{figure}
@@ -1941,18 +1933,25 @@ high-stakes direction applied.}
 \centering
 \figslot{ui/multi-steering/deception-sycophancy.png}{\linewidth}{2.2cm}
 \caption{Two behaviours composed: deception $+1.0$, sycophancy $+0.75$, both mass-mean, each
-direction applied at its own behaviour's steering block.}
+direction applied at its own behaviour's steering block. Both are arguably
+present --- the reply endorses swimming the Channel without a life vest
+(sycophancy) and stumbles through suspicious corrections with interrupting
+ellipses (deception).}
 \label{fig:ui-multi}
 \end{minipage}\hfill
 \begin{minipage}[t]{0.485\textwidth}
 \centering
 \figslot{ui/multi-steering/deception-high-stakes.png}{\linewidth}{2.2cm}
 \caption{Composition failing at higher combined coefficients: deception $+1.75$, high-stakes
-$+1.5$.}
+$+1.5$. Traces of both remain --- a request about food is refused and
+answered with catastrophe --- but the reply is no longer related to the
+user prompt.}
 \label{fig:ui-multi2}
 \end{minipage}
 \end{figure}
 
+% layout: keep appendix title with its content
+\clearpage
 \section{Reproducibility}
 \label{app:repro}
 \subsection{Setup}

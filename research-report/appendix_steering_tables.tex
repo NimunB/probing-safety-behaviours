@@ -4,9 +4,9 @@
 
 
 
-\section{Full Steering Response Curves}\label{app:steer-tables}
+\section{Full Steering Tables}\label{app:steer-tables}
 
-All seven coefficients for every direction and evaluation set, as exported to \texttt{exported\_probes/*\_steering\_full.json}. Three things are easiest to see here rather than in the body: whether a curve is monotone in the coefficient, whether the negative half behaves as a control, and where judge coherence falls away from its unsteered baseline.
+Readout NIE, judged behaviour and judged coherence at all seven coefficients, for the three steered directions on every evaluation set, one table per behaviour and set. Exported from \texttt{exported\_probes/*\_steering\_full.json}.
 
 \begin{table}[H]
 \centering
@@ -27,7 +27,7 @@ LR-attention & NIE & -0.08 & +0.02 & -0.02 & +0.00 & +0.07 & +0.20 & +0.56 \\
 \addlinespace[2pt]
 \bottomrule
 \end{tabular}
-\caption{Deception, ID: steering response. Readout NIE, judge behaviour and judge coherence (1--10). Judge rows are omitted: the judge arm is skipped for this set, whose generation prompts are byte-identical under greedy decoding.}
+\caption{Deception, ID: steering response, readout NIE only --- the judge arm is skipped for this set, whose generation prompts are byte-identical under greedy decoding.}
 \label{tab:app-steer-deception-ID}
 \end{minipage}
 \hfill
