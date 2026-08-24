@@ -35,7 +35,9 @@
 \addtolength{\textheight}{36pt}
 % Balance top/bottom margins on every page after the first: shift the text block
 % up 1.8 mm at shipout (page 1 keeps the default so the title area is unchanged).
-\AddToHook{shipout/before}{\ifnum\value{page}>1 \global\voffset=-1.8mm\fi}
+% Page 1 has its own offset: shift up 2.3 mm so the space above the title matches
+% the space below the text (19.3/14.7 mm measured -> ~17/17 mm).
+\AddToHook{shipout/before}{\ifnum\value{page}>1 \global\voffset=-1.8mm\else\global\voffset=-2.3mm\fi}
 \IEEEoverridecommandlockouts
 
 \usepackage[authoryear,round]{natbib}
@@ -183,24 +185,23 @@
 
 %=======================================================================
 \begin{abstract}
-Activation probes are linear directions in a language model's residual stream, used
+Activation probes are computed directions in a language model's residual stream, used
 both to \emph{detect} safety-relevant behaviours and, by adding their direction
 back into the stream, to \emph{steer} them. We explore how the main design
-choices behind such probes interact, within one pipeline and one model
-(Llama-3.1-8B-Instruct), across three behaviours: deception, high-stakes
+choices behind such probes interact, within one pipeline, on one model
+(Llama-3.1-8B-Instruct), and across three behaviours: deception, high-stakes
 awareness and sycophancy. The pipeline crosses two estimators (difference-of-means
 and logistic regression) with three token-pooling schemes (last, mean and learned
-attention), selects layers separately by predictive and causal criteria, and
-evaluates every direction twice: as a detector on held-out and out-of-distribution
-data, and as a steering vector scored by a causal readout and by an LLM judge for
-behaviour and coherence. Prior work read together suggests a \emph{read/write
-dissociation}, in which logistic regression reads best but difference-of-means
-directions write best. We find that it holds for deception and high-stakes but
-not for sycophancy, where the pattern reverses. The reversal appears to follow from the data rather than from the
+attention), selects appropriate layers to detect or steer a behaviour, and
+evaluates every direction twice: as a detector of the behaviour, and as a steering vector 
+to push outputs towards the behaviour. Prior work read together suggests a \emph{read/write
+dissociation}, in which logistic regression reads (detects) best but difference-of-means
+directions write (steer) best. We find that it holds for deception and high-stakes but
+not for sycophancy, where the pattern reverses. The reversal appears to follow partially from the data rather than from the
 estimators. The
-best pooling and the best layer depend on the behaviour, and the layer that
+best pooling technique and the layer choice depend on the behaviour and data, and the layer that
 steers best can sit well before the layer that detects best. The right
-steering metric depends on the task, and the two steering metrics can
+steering metric to use between changing a model's perception and eliciting behaviour depends on the task — and the two can
 disagree outright. The exported probes and
 directions power an interactive interface through which a user can score and
 steer text directly.
@@ -209,26 +210,26 @@ steer text directly.
 %=======================================================================
 \section{Introduction}
 
-As model capabilities advance and they are deployed in increasingly
+As Large Language Model (LLM) capabilities advance and they are deployed in increasingly
 consequential settings, the need to monitor their internal state grows.
-Their outputs cannot be taken at face value: reasoning models' stated
+Their outputs cannot be taken at face value, as reasoning models' stated
 chains of thought are not always faithful to their internal reasoning
 \citep{chen2025}. Detecting and removing undesirable behaviour therefore requires tools that look inside the model.
-\emph{Activation probes}, linear directions in the residual stream, are a
+\emph{Activation probes}, classifiers of the residual stream, are a
 leading candidate: they flag a property at a fraction of the cost of an
 auxiliary monitor model \citep{alain2018,mckenzie2025}, and a direction of
 the same kind, added back into the stream, can steer the behaviour it
 detects. Two questions decide whether a probe is useful: does it
-\emph{detect} the property, in and out of distribution, and is its
+\emph{detect} the property, and is its
 direction \emph{causally implicated}, such that adding it changes what the
-model does?
+model does, both in and out of distribution?
 
 Existing studies typically examine one of these questions for a single behaviour, estimator or pooling scheme. We
 wanted to see how these design choices interact, and so built one pipeline
 that runs two estimators (difference-of-means and logistic regression),
 three pooling schemes (last token, mean and learned attention) and three
 behaviours (deception, high-stakes awareness and sycophancy) through the
-same model, and evaluates every direction for both detection and steering.
+same model, and evaluates every direction for both detection and steering competence.
 Difference-of-means (``mass-mean'')
 directions are reported as the most causally implicated for truth with lower 
 classification accuracy \citep{marks2024}, logistic-regression
@@ -238,7 +239,7 @@ high-stakes detection \citep{mckenzie2025}, and difference-of-means vectors as
 effective steerers of open-ended generation \citep{rimsky2024}.
 
 Read together, these suggest a \emph{read/write dissociation}, in which
-the direction that best reads a behaviour is not the one that best writes
+the direction that best detects a behaviour is not the one that best steers
 it (logistic regression better for detection, difference-of-means better
 for steering), and that some pooling schemes are simply better than
 others. However, the evidence comes from different models, behaviours,
@@ -261,16 +262,14 @@ the interface are available at
 \paragraph{Probing activations}
 Linear probes were introduced by \citet{alain2018}, who trained linear
 classifiers on the activations of Inception v3 and ResNet-50 to predict
-the image recognition classes. They noted
-that the technique could be used as a general instrument for monitoring any objective. 
-\citet{azaria2023} brought applied to language-model
+image recognition classes. 
+\citet{azaria2023} applied this technique to language-model
 truthfulness, training classifiers on hidden activations to predict whether a
 statement is true. \citet{levinstein2024} showed such probes fail to
 generalise in elementary ways, like to negations --- failures which,
 as \citet{marks2024} put it, suggest the probes `may be identifying not truth,
 but other features that correlate with truth on their training data'. That
-critique informs this study's decision to treat causal testing (steering) as
-necessary, and prioritize out-of-distribution transfer over in-distribution
+critique informs this study's decision to prioritize out-of-distribution transfer over in-distribution
 performance.
 
 Later work explores new ways to train probes. Inference-time intervention (ITI;
@@ -280,30 +279,27 @@ as a localisation instrument informs our selection of the detection layer by
 cross-validated AUROC (area under the
 receiver operating characteristic curve). ITI also introduces the mass-mean shift: steering along the
 difference of the class means. \citet{marks2024} repurpose the mass-mean steering direction as a classification
-method, finding it underperforms on logistic regression probes for LLaMA-2-7B,
+method, finding it underperforms compared to logistic regression probes for Llama-2-7B,
 but classifies comparably on larger models (13B, 70B).
 
 \paragraph{Steering activations}
 Steering involves adding a direction to a model's internal activations during a
 forward pass in order to causally shift its behaviour.
 
-ITI
-\citep{li2023} aims to elicit truth, steering on the outputs of selected attention heads, comparing three
-candidate directions: the probe's own weight direction
-(logistic regression), the mass-mean direction, and a contrast-consistent search (CCS) direction \citep{burns2023}. The
-mass-mean steering won decisively. This is the earliest form of the read/write
-dissociation: the direction a classifier learns is measurably worse at steering
+ITI \citep{li2023} aims to elicit truth, steering on the outputs of selected attention heads, comparing three
+candidate directions: logistic regression, the mass-mean direction, and a contrast-consistent search (CCS) direction \citep{burns2023}.
+Mass-mean steering wins decisively. This is the earliest form of the read/write
+dissociation: the direction a logistic regression classifier learns is measurably worse at steering
 than the difference of the class means.
 
 \citet{marks2024} continue this study of eliciting truth, intervening on a
-small set of causally-implicated residual-stream hidden states with each
-estimator's (logistic regression, mass-mean, CCS) direction, evaluated by a normalised indirect effect on the model's own readout
+small set of causally-implicated hidden states, comparing logistic regression, mass-mean, and CCS, evaluating with a normalised indirect effect (NIE) on the model's own readout
 --- and, ``in contrast to prior work'', on out-of-distribution inputs. They
-find the mass-mean direction the most causally implicated. Our primary causal
+find the mass-mean direction the most causally implicated, the better steerer. Our primary causal
 metric, its calibration, and steering logic are taken from them.
 
 Contrastive activation addition (CAA; \citealt{rimsky2024}) uses
-difference-of-means steering of the residual stream into open-ended generation.
+difference-of-means steering of the residual stream for open-ended generation.
 Its vector is the mean activation difference over hundreds of matched
 multiple-choice pairs, with one option exhibiting the
 behaviour, and one not. It steers seven alignment-relevant behaviours in
@@ -335,12 +331,8 @@ magnitude less compute.
 \paragraph{Sycophancy}
 Sycophancy --- deferring to a user's stated belief over an accurate answer ---
 is a documented artefact of preference-based training
-\citep{perez2023,sharma2023}. CAA steers it in both directions on various
-Llama 2 chat models, with the effects splitting across their two instruments:
-subtracting the vector markedly lowers the probability assigned to the
-sycophantic answer option, which sits high unsteered, while adding it registers
-mainly on GPT-4-judged open-ended generations, modestly raising a near-floor
-sycophancy score \citep{rimsky2024}.
+\citep{perez2023,sharma2023}. CAA steers it in both directions in various
+Llama-2 chat models \citep{rimsky2024}.
 
 \paragraph{User-Interface for Probing and Steering}
 \citet{chen2024} combine interpretability techniques with user-experience
@@ -368,8 +360,8 @@ sweep) consumed by one shared pipeline.
 The idea is to use contrastive pairs: one member of each pair exhibits the
 behaviour, and one does not. We train probes on a masked subset of each pair's
 tokens --- the rule is to mask where the behaviour lives (Fig.~\ref{fig:masks}),
-which we call the detection mask --- and later use the directions those probes find to steer generation. All
-training/test splits are 80/20. The held-out 20\% of facts forms the in-distribution (ID) test set, but we rely on
+which we call the detection mask --- and later use the directions those probes find to steer the model. All
+training/test splits are 80/20. The held-out 20\% of facts forms the in-distribution (ID) test set, but we rely more on
 the out-of-distribution (OOD) ones for evaluation.
 
 \begin{figure*}[t]
@@ -437,18 +429,18 @@ right = behaviour on. \colorbox{probed}{\strut Highlighted} spans are the detect
 
 \paragraph{Training Data}
 We reuse Apollo's instructed-pair design
-\citep[§3.2.1]{goldowsky2025} with the true/false statements of \citet{azaria2023}.
+\citep{goldowsky2025} with the true/false statements of \citet{azaria2023}.
 
 We take the 306 true facts in that set and construct contrastive pairs using
 them. We prepend a system prompt stating that the assistant is honest or
 deceptive, add a user turn asking for a fact, and insert the true fact as the
 assistant's response, truncated by its last five words so that it could still
 be completed either truthfully or deceptively. Only the truncated assistant
-response is included in the detection mask and is eligible to be probed (Fig.~\ref{fig:masks}a): the system
+response is included in the detection mask and is eligible to be probed (Fig.~\ref{fig:masks}a), as the system
 prompt contains the behavioural label (honest/deceptive) which would make
-detection trivial based on lexical clues. The pair is \emph{context-defined}, as nothing but the framing differs --- so the
+detection trivial based on lexical clues. The pair is \emph{context-defined}, as nothing but the system prompt framing differs. The
 within-pair activation difference ``should represent the model's `intent' to
-complete the fact deceptively'' \citep[§3.2.1]{goldowsky2025}.
+complete the fact deceptively'' \citep{goldowsky2025}.
 
 \paragraph{Evaluation Data}
 In-distribution accuracy cannot distinguish a probe that has learned the
@@ -552,7 +544,7 @@ Logistic regression learns a separating boundary between behaviour-on and
 behaviour-off examples. The direction vector we save is the weight vector normal
 to that boundary. We fit it with $L_2$ regularisation ($\lambda = 10$) on
 normalized activations (zero-mean, unit variance), reproducing Apollo's
-hyperparameters exactly \citep[§3.1]{goldowsky2025}, and fit no intercept, so
+hyperparameters exactly \citep{goldowsky2025}, and fit no intercept, so
 zero is the probe's own boundary. When evaluating new samples, we apply the same
 normalization and project the activations onto the probe direction to get a
 real-valued behavioural score for each probed token.
@@ -573,9 +565,9 @@ CAA \citep{rimsky2024}, then repurposed as a probing classifier by
 \citet{marks2024}. On paired data (Fig.~\ref{fig:masks}) the differencing
 cancels whatever the pair shares, isolating the behaviour. We use plain
 $\boldsymbol{\theta}_{\mathrm{mm}}$ rather than the covariance-corrected variant
-$\Sigma^{-1}\boldsymbol{\theta}_{\mathrm{mm}}$ \citep[App.~F]{marks2024}, as
+$\Sigma^{-1}\boldsymbol{\theta}_{\mathrm{mm}}$ \citep{marks2024}, as
 they report the plain direction to be the one that transfers
-out-of-distribution, which is what we prioritise.
+out of distribution, which is what we prioritise.
 
 \subsubsection{Pooling Strategies}
 The estimators score a single activation vector, so another design decision is
@@ -1962,7 +1954,7 @@ are 11--15, 6--10 and 6--10 respectively.
 \subsection{What is fixed}
 Re-running the three notebooks reproduces every reported number except the judge scores: the
 cross-validated AUROC layer curves and the detection layers chosen from them; the held-out AUROCs
-with their bootstrap CIs and TPR at 1\% FPR, in- and out-of-distribution; the per-layer NIE sweeps
+with their bootstrap CIs and TPR at 1\% FPR, in and out of distribution; the per-layer NIE sweeps
 and the steering blocks chosen from them; the NIE at every steering coefficient; the
 probe-direction cosines; and the per-token score and attention-weight figures. Five things make
 this hold.
