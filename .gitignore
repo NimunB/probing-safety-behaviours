@@ -22,7 +22,7 @@ docs-for-nimun/
 # exported_probes/ ~0.5 MB per behaviour; the only GPU-expensive artefact that is not
 #                  reproducible from the repo alone. Commit these.
 
-# LaTeX build artifacts (research-report/report.tex); the PDF is regenerable via latexmk.
+# LaTeX build artifacts; the PDF is regenerable via latexmk.
 *.aux
 *.log
 *.out
@@ -33,9 +33,11 @@ docs-for-nimun/
 *.bbl
 *.blg
 *.toc
-research-report/*.pdf
-# ...except the dissertation itself, which is committed so it is readable on GitHub.
-!research-report/Nimun_Bajwa_PG_Project_Dissertation.pdf
+
+# The dissertation and its sources — local only (untracked 2026-08-25).
+# Previously committed; the last committed version is recoverable from git history
+# at a43b4c8 (`git show a43b4c8:research-report/<file>`).
+research-report/
 
 __pycache__/
 *.py[cod]
