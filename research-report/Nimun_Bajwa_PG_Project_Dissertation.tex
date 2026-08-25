@@ -763,20 +763,17 @@ single layer.
 \subsection{Interface}
 \label{sec:impl}
 
-Each behaviour exports a $\sim$0.5\,MB bundle: the five fitted probes at its
-detection layer (MM (last), MM (mean), LR (last),
-LR (mean), LR-attention), the calibrated directions
-(MM (mean), LR (mean), LR-attention) at each layer
-of its steering block, and the layer choices. These saved artefacts drive an interactive
-interface over the live model. Following \citet{chen2024}, who show that probe-backed 
-read-and-write access can serve as a user-facing transparency tool, a user can paste a
-conversation and have every token scored by any probe in the grid from a single
-forward pass at that behaviour's detection layer
-(Fig.~\ref{fig:ui}), or
-generate the same prompt twice --- unsteered and steered --- with any direction
-at a chosen coefficient in class-gap units (Fig.~\ref{fig:ui-steer}). A third tab sums
-two behaviours' directions into one generation, each at its own block, the
-configuration \citet{vanderweij2024} find promising.
+Each behaviour exports a $\sim$0.5\,MB bundle: the five probes at its detection
+layer (MM (last), MM (mean), LR (last), LR (mean), LR-attention), and the three
+steered directions (MM (mean), LR (mean), LR-attention), calibrated, at every
+layer of its steering block.
+These saved artefacts drive an interactive interface over the live model,
+inspired by \citet{chen2024}. A user can paste a conversation and have every
+token scored by any probe in the grid (Fig.~\ref{fig:ui}), or generate two
+responses to the same prompt --- unsteered and steered --- with any direction
+at a chosen coefficient in class-gap units (Fig.~\ref{fig:ui-steer}). A third
+tab steers two behaviours at once, each at its own block, as
+\citet{vanderweij2024} do.
 
 \section{Results}
 \label{sec:results}
@@ -804,13 +801,13 @@ The steering block consists of layers 11--15. The detection layer
 falls inside this block, toward its lower end.
 
 \subsubsection{Detection}
-In distribution, detection is at or near ceiling: three of the five probes
+In distribution, detection performance is at or near ceiling: three of the five probes
 reach an AUROC of 1.000, with LR (last) at 0.996 and MM (last) at 0.948
 (Fig.~\ref{fig:detid}). Out of distribution, pooling both held-out sets,
 LR (mean) leads at 0.722, ahead of MM (last) at 0.696; LR (last) trails at
 0.571 (Appendix~\ref{app:det-tables}).
 
-The two held-out sets separate sharply (Fig.~\ref{fig:detood}). On AI Liar,
+The two OOD sets separate sharply (Fig.~\ref{fig:detood}). On AI Liar,
 every probe except LR (last) scores above 0.95 (best: MM (mean) at 0.992).
 On Roleplaying, the highest is LR (mean)'s 0.706. This discrepancy could be
 explained by AI Liar's deception being \emph{context-defined}, like our
@@ -825,32 +822,30 @@ Roleplaying, where we fall to 0.706. Scale is a plausible explanation:
 clearly as models grow.
 
 \subsubsection{Steering}
-In distribution, mass-mean gives the expected monotone response: the
-largest readout shift toward the behaviour at positive coefficients
+In distribution, MM gives the expected monotone response for deception: the
+largest NIE readout shift toward the behaviour at positive coefficients
 ($+1.53$ at $+2$) and the largest shift away at negative ones ($-0.23$ at
-$-2$), with attention following more weakly and logistic regression barely
+$-2$), with LR-attention following more weakly and LR barely
 moving on the positive side ($+0.13$ at $+2$) while running the wrong way
 on the negative side ($+0.37$ at $-2$) (Fig.~\ref{fig:app-steer-id}a).
 
-That ordering --- MM $>$ attention $>$ LR --- holds on both held-out sets.
-On AI Liar, mass-mean rises almost monotonically from $-0.064$ at $-2$ to
-$+0.046$ at $+2$; attention has the same shape but subdued, staying within
-$-0.013$ to $+0.010$; and logistic regression, interestingly, falls
+That ordering --- MM $>$ LR-attention $>$ LR --- holds on both OOD sets.
+On AI Liar, MM rises almost monotonically on NIE readout from $-0.064$ at $-2$ to
+$+0.046$ at $+2$; attention has the same shape though subdued, staying within
+$-0.013$ to $+0.010$; and LR, interestingly, falls
 monotonically in the opposite direction, from $+0.087$ at $-2$ to $-0.087$
-at $+2$. On Roleplaying, mass-mean leads on the positive side ($+0.134$ at
+at $+2$. On Roleplaying, MM leads at positive coefficients ($+0.134$ at
 $+1$, $+0.349$ at $+2$) but also rises at $-2$ ($+0.116$), a U-shape rather
-than a monotone response. Logistic regression shows an asymmetric version
-of the same shape, highest at $-2$ ($+0.217$); only attention stays near
+than a monotone response. LR shows an asymmetric version
+of the same shape, highest at $-2$ ($+0.217$); only LR-attention stays near
 zero on the negative side and rises steadily on the positive one, to
 $+0.214$ at $+2$ (Fig.~\ref{fig:steer}a--b).
 
-The judge does not follow the readout's shape. Judged behaviour is flat on both
-sets --- at most $1.4$ points from a $2.1$ baseline on AI Liar, and never
-above $8.0$ on Roleplaying, whose unsteered completions already score
-$6.7$ --- so a shift in the model's self-report (NIE) does not transfer
+The LLM judge does not follow the NIE readout's shape. Judged behaviour is flat on both
+sets --- at most $1.4$ points from a $2.1$ unsteered baseline on AI Liar, and
+$1.3$ from a $6.7$ baseline on Roleplaying --- so a shift in the model's self-report (NIE) does not transfer
 into elicited behaviour. Coherence moves more than behaviour and degrades
-at the extremes: mass-mean peaks at $+1$ on AI Liar ($8.71$, against
-$7.04$ at $+2$) and falls to $2.96$ and $4.12$ at $\pm 2$ on Roleplaying,
+at the extremes: it falls to $2.96$ and $4.12$ at $\pm 2$ on Roleplaying,
 with higher values in the centre, matching \citeauthor{rimsky2024}'s (\citeyear{rimsky2024})
 finding that large multipliers degrade text quality.
 
@@ -874,10 +869,10 @@ judged behaviour, and judged coherence across steering coefficients.}
 
 \subsubsection{Layer Selection}
 The detection layer is 20 of 32 (Fig.~\ref{fig:cv-hs}), with a
-cross-validated AUROC of 0.949 --- 62.5\% depth, later than deception's
+cross-validated AUROC of 0.949. The layer's depth is 62.5\%, later than deception's
 37.5\%. The later layer could be explained by the complexity of what is
 probed: high-stakes training samples (Models Under Pressure) are user
-prompts describing an entire situation, not one-off statements like
+prompts describing a complex situation, not one-off statements like
 deception and sycophancy --- a median of 58 probed tokens, against six for
 deception. \citet{marks2024} observe that linear structure emerges
 later for more structurally complex statements.
@@ -885,12 +880,12 @@ later for more structurally complex statements.
 \citet{mckenzie2025} selected layer 31 of 80 on their 70B model
 (38.75\% depth), using cross-validated \emph{accuracy} of a mean-pooled
 logistic probe on the same training data, where we use AUROC of MM (mean).
-Potentially the larger model develops its internal understanding of the
-situation earlier: \citet{marks2024} find that linear representations
+Potentially the larger model is capable of developing an internal understanding of the
+stakes earlier: \citet{marks2024} find that linear representations
 of truth strengthen with scale.
 
 The steering block is layers 6--10 (Fig.~\ref{fig:nie-hs}). Interestingly,
-the detection layer sits ten layers above the steering block.
+the detection layer sits ten layers after the steering block.
 
 \subsubsection{Detection}
 In distribution, detection is high but does not saturate like deception:
@@ -918,7 +913,7 @@ distribution, all three readouts are monotone and S-shaped, with mass-mean
 steepest (Fig.~\ref{fig:app-steer-id}b). On OOD (Anthropic-HH), mass-mean
 has a large lead --- $+0.23$, $+0.72$, $+1.34$ at $+0.5$, $+1$ and $+2$,
 against $+0.68$ for attention and $+0.32$ for logistic regression at $+2$
---- while the negative side is flat for all three, at about $-0.07$
+--- while the negative coefficients are flat for all three, at about $-0.07$
 (Fig.~\ref{fig:steer}c).
 
 The judge agrees with the readout in distribution but not out of it. In
