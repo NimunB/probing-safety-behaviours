@@ -613,9 +613,7 @@ average on-behaviour activation \citep{marks2024}, and sweep over coefficients
 $\{-2, -1, -0.5, 0, +0.5, +1, +2\}$, following CAA's practice
 \citep{rimsky2024}. One unit of coefficient then
 means one class gap for every direction, layer, and behaviour, and the effect
-curves become directly comparable. For LR, the weight vector is first divided
-back through the scaler's standard deviation so the direction sits in raw
-activation space.
+curves become directly comparable.
 
 At the block chosen in §\ref{sec:methodology}-D.2, each layer receives its own
 direction: MM and LR are refit from that layer's pooled activations, and the
@@ -664,8 +662,8 @@ steered, and the answer is read at the
 
 \subsubsection{Steering Evaluation}
 \label{sec:steereval}
-We employ two separate independent instruments, which are measured at every
-(direction, coefficient), because they answer different questions and can
+We employ two separate instruments, which are measured at every
+(direction, coefficient) pair, because they answer different questions and can
 disagree.
 
 The primary metric is the \textbf{normalised indirect effect} (NIE), which reproduces
@@ -681,22 +679,17 @@ steered off-behaviour transcripts ($PD^{-}_{*}$). The NIE is then given as:
 \label{eq:nie}
 \end{equation}
 Here, $0$ means the intervention did nothing and $1$ means it moved the
-negatives a full class gap. The denominator is meaningful only when the readout
-separates the classes unsteered; a warning fires below a gap of $0.05$.
+negatives a full class gap. 
 We strategically only steer the tokens of the transcript under evaluation, and
-not the few-shot demonstrations or the question: the final position answers by
-attending to them, so steering their representations could shift
-$P(\textsc{yes}) - P(\textsc{no})$ directly, without the transcript's
-representation changing. The prompt used for NIE, and the tokens steered, are
+not the few-shot demonstrations or the question, as the final position answers by
+attending to them. The prompt used for NIE, and the tokens steered, are
 visualized in Fig.~\ref{fig:scope}.
 
 The NIE tests whether steering moves the model's \emph{judgment} of a
 transcript; open-ended generation tests whether it moves the model's
 \emph{behaviour}. To
-evaluate this, we remove the assistant response from a held-out item and let the
-model write its own response: for deception and sycophancy this leaves the
-system and user turns, and for the multi-turn high-stakes conversations we trim
-to the last user turn so the model continues a real dialogue. We steer every
+evaluate this, we remove the last assistant response from a held-out item and let the
+model write its own response. We steer every
 token of that prompt and every token it generates, across the steering block of
 layers selected in §\ref{sec:methodology}-D.2 (Fig.~\ref{fig:scope-gen}).
 
@@ -722,22 +715,22 @@ whole item is steered, prompt and completion alike.}
 \label{fig:scope-gen}
 \end{figure}
 
-An \textbf{LLM judge} (Claude Haiku 4.5) then scores each generation 1--10 on how
+An \textbf{LLM judge} (Claude Haiku 4.5) then scores each generation from 1--10 on how
 strongly the assistant response exhibits the target behaviour, following
 \citeauthor{rimsky2024}'s (\citeyear{rimsky2024}) scoring instruction, and separately on coherence
 (prompts are shown in Appendix~\ref{app:judge}).
 
-Each (direction, coefficient) averages the scores from 24 generations (CAA use 50), drawn from off-behaviour prompts.
+Each (direction, coefficient) pair averages the scores from 24 generations (CAA use 50), drawn from off-behaviour prompts.
 
 
 
 
 \subsection{Layer Selection}
 This section determines which
-layer's hidden states we probe, and which layers we steer.
+layer's hidden states we probe, and separately which layers we steer.
 
 \subsubsection{Probing Layer Selection}
-The detection layer is chosen as the earliest layer with the highest pair-aware 5-fold
+The detection layer is chosen to be the earliest layer with the highest pair-aware 5-fold
 cross-validated AUROC of a mass-mean probe on mean-pooled training activations,
 swept over all 32 layers. Mass-mean is the estimator because it is closed form,
 and therefore more efficient to train on cached activations. We overlay a
@@ -753,7 +746,7 @@ bias the evaluation sets.
 Just as the detection layer is selected by our detection metric, the steering
 block is selected by our steering metric: the normalised indirect effect (NIE),
 covered in §\ref{sec:steereval}. The sweep
-adds each layer's mean-gap-calibrated, mean-pooled mass-mean direction at
+adds each layer's calibrated, mean-pooled mass-mean direction at
 coefficient $+1$.
 The readout runs on behaviour-off training-split
 transcripts, and we select the contiguous five-layer window with the highest summed NIE. We
@@ -762,8 +755,7 @@ effect is spread across neighbouring layers rather than concentrated at one
 (Fig.~\ref{fig:nie-syc}), and \citet{marks2024} likewise intervene on
 their whole causally implicated group of hidden states, not a single site.
 Anchoring the sweep on mass-mean is a disclosed mild bias toward it in the
-later comparison, accepted because one shared block keeps the three directions
-comparable at intervention time. CAA likewise
+later comparison. CAA likewise
 choose their steering layer by sweeping every layer and taking the largest
 effect on their readout \citep{rimsky2024}, though at both $\pm 1$ and for a
 single layer.
