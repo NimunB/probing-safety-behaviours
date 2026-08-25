@@ -888,10 +888,10 @@ The steering block is layers 6--10 (Fig.~\ref{fig:nie-hs}). Interestingly,
 the detection layer sits ten layers after the steering block.
 
 \subsubsection{Detection}
-In distribution, detection is high but does not saturate like deception:
+In distribution, detection performance is high but does not saturate like deception:
 scores spread across 0.885--0.996, with LR-attention highest at 0.996 and
 LR (mean) next at 0.993 (Fig.~\ref{fig:detid}). The training data (Models
-Under Pressure) could be too complex for the probes to fully separate.
+Under Pressure) could be too complex for the probes to fully separate and saturate at 1.00 like with deception ID.
 
 On OOD (Anthropic-HH), every probe falls by 0.20--0.28
 (Fig.~\ref{fig:detood}). LR (mean) leads at 0.774, followed by LR-attention
@@ -908,7 +908,7 @@ approximately 0.96 on Anthropic-HH, where ours reaches 0.755 ---
 potentially a scale effect again.
 
 \subsubsection{Steering}
-The ordering MM $>$ attention $>$ LR holds again on both sets. In
+The ordering MM $>$ LR-attention $>$ LR holds again on both sets. In
 distribution, all three readouts are monotone and S-shaped, with mass-mean
 steepest (Fig.~\ref{fig:app-steer-id}b). On OOD (Anthropic-HH), mass-mean
 has a large lead --- $+0.23$, $+0.72$, $+1.34$ at $+0.5$, $+1$ and $+2$,
@@ -917,29 +917,29 @@ against $+0.68$ for attention and $+0.32$ for logistic regression at $+2$
 (Fig.~\ref{fig:steer}c).
 
 The judge agrees with the readout in distribution but not out of it. In
-distribution, mass-mean moves judged behaviour across the whole sweep
-(2.46 at $-2$, 4.08 unsteered, 7.54 at $+2$), with logistic regression and
-attention reaching only about 5.3 at $+2$. On OOD (Anthropic-HH), judged
+distribution, MM moves judged behaviour across the whole sweep
+(2.46 at $-2$, 4.08 unsteered, 7.54 at $+2$), with LR and
+LR-attention reaching only about 5.3 at $+2$. On OOD (Anthropic-HH), judged
 behaviour is flat for every direction (mass-mean highest at $+2$, 2.38
 from a 1.67 baseline). Again, steering changes the model's self-report of
 the situation (NIE), but not the generated conversation. Coherence declines
 monotonically under mass-mean (7.21 at $-2$ to 3.92 at $+2$) and stays
-flat for the others.
+flat for the others (Fig.~\ref{fig:steer}c).
 
 \subsection{Sycophancy}
 
 \subsubsection{Layer Selection}
 The detection layer is 19 of 32 (Fig.~\ref{fig:cv-syc}), with a
 cross-validated AUROC of 0.940 --- 59.4\% depth, deep like high-stakes
-despite the training samples being one-off statements again. A possible
+despite the training samples being one-off statements. A possible
 reason is that the label is relational, not lexical: 29\% of the training
-negatives are genuine agreements, so the probe cannot read agreement alone
---- it must combine the reply's stance with the truth of the user's claim.
+negatives (off-behaviour) are genuine agreements, so the probe cannot read agreement alone
+--- it must combine the reply's stance with the truth of the user's claim, which adds complexity and might require more layers to represent.
 \citet{cincynlp2025} likewise find that sycophantic and genuine
 agreement only separate representationally around mid-network depth.
 
 The steering block is layers 6--10 (Fig.~\ref{fig:nie-syc}). Like
-high-stakes, the detection layer sits well above the steering block ---
+high-stakes, the detection layer sits well after the steering block ---
 nine layers in this case.
 
 \subsubsection{Detection}
@@ -947,8 +947,8 @@ Last-token pooling leads for once. In distribution, the top three are
 MM (last) at 0.976, LR (last) at 0.975 and LR-attention at 0.974 ---
 near-tied (Fig.~\ref{fig:detid}) --- and the same three lead on OOD (math),
 with MM (last) best at 0.879 (Fig.~\ref{fig:detood}). The two mean-pooled
-probes come last on both sets, despite being quite strong for the
-other two behaviours.
+probes come last on both sets, despite being strong detectors
+on the other two behaviours.
 
 This inversion follows from the data construction: assistant replies share a
 templated prefix, and the difference between a sycophantic and a candid
@@ -957,32 +957,31 @@ either echoes the user's belief or contradicts it (Fig.~\ref{fig:masks}c).
 Mean pooling dilutes that signal over the shared template. LR-attention
 stays competitive because it can learn where to look: in the example of
 Fig.~\ref{fig:app-attn}, it puts 0.38 of its pooling mass on the echoed
-answer token. Our last token is the reply's closing punctuation, one
-position after the answer word --- the site \citet{marks2024} probe,
+answer token. Last tokens dominate because they are close after the answer word --- the site \citet{marks2024} probe,
 noting that the final word's own representation can be dominated by the
 token's identity.
 
 \subsubsection{Steering}
-The steering ordering changes: attention $>$ MM $>$ LR on both sets, where
+The steering ordering changes: LR-attention $>$ MM $>$ LR on both sets, where
 deception and high-stakes had MM $>$ attention $>$ LR. The attention
 direction is the only one with a monotone readout on both sets, rising
-from $-0.75$ at $-2$ to $+0.81$ at $+2$ in distribution and from $-1.28$
-to $+0.77$ on math (OOD). Mass-mean is negative at negative
+from $-0.75$ at $-2$ to $+0.81$ at $+2$ ID, and from $-1.28$
+to $+0.77$ OOD (Figs.~\ref{fig:app-steer-id}c and~\ref{fig:steer}d). MM is negative at negative
 coefficients and mostly positive at positive ones, but dips sharply at
-$+1$ ($-0.53$ in distribution, $-0.92$ on math) before recovering at $+2$
-($+0.69$ and $+0.40$). Logistic regression also rises monotonically in
+$+1$ ($-0.53$ ID, $-0.92$ OOD) before recovering at $+2$.
+LR, like LR-attention also rises monotonically in
 distribution, but is very flat on both sets, staying within $0.07$ of
 zero. The
 OOD curves match the in-distribution ones closely for every direction,
-which follows from the data: math is the same factorial template as the
+which follows from the data: math (OOD) is the same factorial template as the
 in-distribution domains --- a professor's belief, then a one-line reply
 that echoes or corrects it.
 
 The shape of judged behaviour also matches across the two sets, and is
-flat for every direction except mass-mean at $+1$, where it spikes to
-$9.71$ in distribution and $9.42$ on math from baselines near $1.0$ ---
-interestingly, the one positive coefficient at which mass-mean's readout
-is negative (itself an outlier). On both sets, mass-mean's coherence peaks
+flat for every direction except MM at $+1$, where it spikes to
+$9.71$ ID and $9.42$ OOD from baselines near $1.0$ ---
+interestingly, the one positive coefficient at which MM's readout
+is negative (itself an outlier). On both sets, MM's coherence peaks
 near the centre ($9.67$ ID and $9.21$ OOD at $+0.5$), falls to $2.88$ and
 $4.17$ at $+1$, and collapses to $1.00$ at $\pm 2$.
 Attention's is similar but muted ($6.75$ and $5.42$ at $\pm 2$ on math);
