@@ -1,4 +1,4 @@
-"""Probe export/import — the ~0.5 MB artefact that outlives the run (notebook §1h, plan #43).
+"""Probe export/import — the ~0.5 MB artefact that outlives the run.
 
 Exports NO activations. A fitted probe is a handful of vectors; activations were only ever its
 training data. Live detection and steering both run a forward pass on the user's own input, so
@@ -40,7 +40,7 @@ def export_behaviour(spec, grid, detect_layer, steer_block, steer_dirs, d_model,
     """Serialize everything needed to RUN one behaviour's probes, without re-running the pipeline.
 
     All tensors are cast to fp32 on CPU: probes are tiny, and fp16 directions would reintroduce
-    the dtype mismatch `MMProbe.score` had to work around (plan #21).
+    the dtype mismatch `MMProbe.score` had to work around.
     """
     detection = {}
     for name, (probe, pooling) in grid.items():

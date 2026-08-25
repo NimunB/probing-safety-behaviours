@@ -1,26 +1,4 @@
 """Chat templating and detection masks — the tokenization boundary of the whole pipeline.
-
-THIS MODULE IS THE ARENA CUT. `build_detection_mask` and `clean_bpe_token` are vendored from
-`ARENA_3.0/chapter1_transformer_interp/exercises/part31_linear_probes/utils.py`; after this
-file exists, nothing in the project imports from the ARENA course repo.
-
-WHY IT MATTERS MORE THAN IT LOOKS
----------------------------------
-Every activation the probes ever see is indexed by a mask produced here. If templating and
-masking disagree by even one token, every probe score is computed on the wrong activations —
-silently, with no error. That is exactly what the double-BOS bug (plan #22) was. Any consumer
-of this project — including the UI — MUST tokenize through these helpers rather than calling
-`apply_chat_template` itself, or that bug returns.
-
-VENDORING DECISION (2026-07-20)
--------------------------------
-`build_detection_mask` is copied VERBATIM from ARENA's utils.py, including its double-BOS
-quirk (it tokenizes its own BOS-bearing template string with add_special_tokens=True). We now
-own this code and could fix it at source — but the notebook's audited behaviour is
-"vendor-quirk + strip-fix in the caller", and changing the mask construction would invalidate
-the line-by-line audit and every cached activation. The strip-fix therefore stays in
-`chat_with_assistant_mask` where the notebook has it. Revisit only with a cache wipe and a
-re-run of both behaviours.
 """
 
 from __future__ import annotations
@@ -31,10 +9,6 @@ from torch import Tensor
 
 from . import runtime
 
-
-# =========================================================================================
-# Vendored from ARENA utils.py — do not edit without reading the vendoring note above.
-# =========================================================================================
 
 def clean_bpe_token(tok: str) -> str:
     """Replace byte-level BPE artifacts with readable characters.
@@ -109,14 +83,14 @@ def build_detection_mask(
 
 
 # =========================================================================================
-# Project helpers (from notebook §1c) — every templated string must go through chat_text.
+# Project helpers — every templated string must go through chat_text.
 # =========================================================================================
 
 def chat_text(messages, **kwargs) -> str:
     """apply_chat_template(tokenize=False) with the template's leading BOS stripped, so downstream
-    tokenizer() calls (which add their own BOS) produce exactly ONE <|begin_of_text|>. Fix
-    2026-07-13 (plan #22): previously every templated path double-BOSed (quirk inherited from [NB],
-    whose utils tokenize the BOS-bearing template string with add_special_tokens=True). ALL
+    tokenizer() calls (which add their own BOS) produce exactly ONE <|begin_of_text|>. Previously
+    every templated path double-BOSed (the template string is BOS-bearing and was tokenized
+    with add_special_tokens=True). ALL
     templated-text creation must go through here so masks and activations stay aligned."""
     tok = runtime.get_tokenizer()
     return tok.apply_chat_template(messages, tokenize=False, **kwargs).removeprefix(tok.bos_token)
@@ -141,7 +115,7 @@ def chat_with_assistant_mask(messages: list[dict[str, str]]) -> tuple[str, Bool[
 
 def chat_with_content_mask(messages: list[dict[str, str]]) -> tuple[str, Bool[Tensor, " seq"]]:
     """(text, mask over MESSAGE-CONTENT tokens of every role) — the high-stakes mask policy
-    "content_tokens" (2026-07-19, plan #31; replaces full-sequence pooling, a disclosed deviation
+    "content_tokens" (replaces full-sequence pooling, a disclosed deviation
     from [HS §2.1]). Excludes BOS, header tags, <|eot_id|>s, and the template's auto-injected date
     preamble; includes system/user/assistant contents of every turn. Multi-turn safe, unlike
     build_detection_mask (which assumes one message per role): walks the messages in template

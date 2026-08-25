@@ -1,7 +1,4 @@
-"""`BehaviourSpec` — everything behaviour-specific, in one dataclass (notebook §1b).
-
-Kept in its own module (rather than inside `datasets`) so that lightweight consumers — the
-export bundle, the UI — can import the type without pulling in HuggingFace dataset loading.
+"""`BehaviourSpec` — everything behaviour-specific, in one dataclass.
 
 Adding a behaviour means writing one of these plus a loader; nothing in the pipeline is
 hard-coded to deception or high-stakes. Sycophancy will replace the YES/NO `readout_targets`

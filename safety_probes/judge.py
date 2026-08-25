@@ -1,20 +1,5 @@
-"""LLM judge — scores steered generations for behaviour + coherence (notebook §1g, cell 37).
+"""LLM judge — scores steered generations for behaviour + coherence.
 
-WHAT CHANGED FROM THE NOTEBOOK, AND WHY
----------------------------------------
-The notebook builds `_judge_client` at IMPORT time from `ANTHROPIC_API_KEY`, because by the time
-its §1g cell runs, §1a has already called `load_dotenv`. A module cannot assume that ordering —
-importing `judge` must not require the env to be loaded yet. So the client is built LAZILY on
-first use, via `get_client()`, after `runtime.load_env()` has populated the key. The scoring logic
-(schema, prompt, parsing) is otherwise identical, including the enum bound.
-
-THE SCHEMA BOUND IS `enum`, NOT `minimum`/`maximum` (plan #44)
--------------------------------------------------------------
-The structured-outputs JSON-Schema subset rejects numerical constraints on integers
-(`400: For 'integer' type, properties maximum, minimum are not supported`). #33 tried to bound the
-scores with `minimum`/`maximum` and every judge call silently 400'd (the exception is swallowed →
-None → empty judge panels). `enum` IS in the supported subset, so the 1..10 bound is genuinely
-server-enforced. Do not reintroduce min/max here.
 """
 
 from __future__ import annotations
@@ -28,11 +13,7 @@ from .spec import BehaviourSpec
 
 JUDGE_MODEL = "claude-haiku-4-5"
 
-#: Generations judged per (direction, coef) point (final-run n, plan #46; was 6 during
-#: development — n=6 integer scores made the judge curves jumpy, cf. CAA's 50). Each judged eval
-#: set costs 19 points × this many generations. AI Liar's 27 items still cover 24 generation
-#: prompts; deception ID passes NO prompts (judge dropped there — its prompts are byte-identical
-#: under greedy decoding, #40b/#46 — so the ID positive control is NIE-only).
+#: Generations judged per (direction, coef) point
 N_JUDGE_PROMPTS = 24
 
 _judge_client = None
@@ -63,7 +44,7 @@ def get_client():
 
 def prompt_for_judge(templated: str) -> str:
     """Plaintext 'Role: content' view of a chat-templated generation prompt, FOR THE JUDGE ONLY
-    (decision 2026-07-19, plan #33): template tags and the auto-injected date preamble are stripped
+    : template tags and the auto-injected date preamble are stripped
     so the judge reads a clean transcript. Generation itself still uses the templated text."""
     segs = _re.findall(r"<\|start_header_id\|>(\w+)<\|end_header_id\|>\n\n(.*?)(?:<\|eot_id\|>|$)",
                        templated, flags=_re.S)

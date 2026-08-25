@@ -1,4 +1,4 @@
-"""Steering: hooks, calibration, the NIE readout, and direction-building (notebook §1g).
+"""Steering: hooks, calibration, the NIE readout, and direction-building.
 
 Covers everything on the WRITE side of the pipeline:
   * apply steering      — SteeringHook, generate_steered, compose_steering
@@ -17,9 +17,9 @@ gap** [GoT §6.1]. That scale is baked into the vector, not carried alongside it
 `export.py` insists on exporting `calibrate_block()` output rather than raw directions. One
 convention for MM / LR / LR-attention alike, so coefficients are comparable across methods.
 
-ADDITION-ONLY BY DESIGN (decision 2026-07-11, plan #12)
--------------------------------------------------------
-Every steering source we follow — [CAA], [GoT §6], van der Weij et al. (2024), and [NB]'s hooks —
+ADDITION-ONLY BY DESIGN
+-----------------------
+Every steering source we follow — [CAA], [GoT §6], van der Weij et al. (2024) —
 steers by signed addition; a negative coefficient is subtraction. If refusal is ever added:
 Arditi et al. SUPPRESS refusal by directional *ablation* (projection), which addition does not
 replicate. Re-introduce an ablate mode then, and do not read a null negative-add as "not causal".
@@ -38,21 +38,21 @@ from .probes import LRProbe, MMProbe, train_attention_probe
 from .spec import BehaviourSpec
 
 
-# WHERE the steering vector is written — HARD-CODED conventions, one per instrument (plan #59;
-# the mode flags that briefly existed here were removed on the #12 precedent: no untested branches
-# in the class that mutates the residual stream).
+# WHERE the steering vector is written — HARD-CODED conventions, one per instrument.
+# The mode flags that briefly existed here were removed: no untested branches
+# in the class that mutates the residual stream.
 #
 # READOUT (transcript scope): write ONLY to the item transcript's tokens — not the few-shot
 #   demonstrations and not the trailing question. The demonstrations contain the literal
 #   " YES"/" NO" tokens the NIE reads, so steering them would be direct pressure on the
 #   instrument; [GoT §6.1] excludes the readout position for exactly this reason.
 #
-# GENERATION (whole-item scope, #60): write to EVERY position — the full prompt (template tags
+# GENERATION (whole-item scope): write to EVERY position — the full prompt (template tags
 #   included) and every generated token. The generation prompt contains no measurement apparatus
 #   (no few-shot, no readout tokens; the judge reads the text later, out-of-band), so there is
 #   nothing to protect. One rule covers both instruments: STEER THE ITEM, NEVER THE APPARATUS.
 #   This deliberately deviates from CAA-main's [/INST]-onward convention, and the deviation is
-#   EVIDENCE-BASED (#59's three-regime ablation): at calibrated doses, CAA-exact and
+#   EVIDENCE-BASED (a three-regime ablation): at calibrated doses, CAA-exact and
 #   completion-only scopes left judged behaviour flat for all three behaviours (MM shattered
 #   coherence before caving; LR-family stayed inert with full headroom), while whole-item steering
 #   produced coherent behavioural movement (e.g. sycophancy OOD: MM at +1 = behaviour 7.3 /
@@ -70,7 +70,7 @@ class SteeringHook:
 
     All-token application remains the convention *within* a scope, uniformly across MM, LR and
     LR-attention, so a difference between arms can only come from the direction and never from one
-    method touching fewer tokens than another (plan #33).
+    method touching fewer tokens than another.
 
     Use as a context manager, or call enable()/disable() explicitly:
 
@@ -97,7 +97,7 @@ class SteeringHook:
             add = self.coef * v.to(hs.dtype)
             if self.positions is not None and is_prefill:
                 if self.positions.shape[1] != hs.shape[1]:
-                    # Fail loud (#38): silently steering everything is the defect this scope fixes.
+                    # Fail loud: silently steering everything is the defect this scope fixes.
                     raise RuntimeError(
                         f"SteeringHook.positions has seq={self.positions.shape[1]} but the forward "
                         f"pass has seq={hs.shape[1]}. The mask must be rebuilt per batch.")
@@ -170,7 +170,7 @@ def generate_steered(prompt_text: str, hook: SteeringHook | None, max_new_tokens
     """Greedy generation with an optional steering hook active. Deterministic (do_sample=False),
     so a coefficient of 0 reproduces the baseline exactly.
 
-    STEERING SCOPE (whole-item, #60): every prompt position and every generated token — see the
+    STEERING SCOPE (whole-item): every prompt position and every generated token — see the
     module scope note for the rule and the evidence.
     """
     model, tokenizer = runtime.get_model(), runtime.get_tokenizer()
@@ -188,7 +188,7 @@ def generate_steered(prompt_text: str, hook: SteeringHook | None, max_new_tokens
 @t.no_grad()
 def generate_steered_batch(prompt_texts: list[str], hook: SteeringHook | None,
                            max_new_tokens: int = 80, batch_size: int = 8) -> list[str]:
-    """Batched greedy generation with an optional steering hook (plan #52b).
+    """Batched greedy generation with an optional steering hook.
 
     Same parameters as `generate_steered` (greedy, max_length=512 truncation, eos padding), but
     processes prompts in batches so the GPU is actually used. Prompts are LEFT-padded per batch so
@@ -198,7 +198,7 @@ def generate_steered_batch(prompt_texts: list[str], hook: SteeringHook | None,
     wording from the one-at-a-time path — acceptable for the judge, which has no cross-run
     comparability requirement (#44/#47).
 
-    STEERING SCOPE (whole-item, #60): as `generate_steered`. Pad positions also receive the add,
+    STEERING SCOPE (whole-item): as `generate_steered`. Pad positions also receive the add,
     which is harmless — they are attention-masked, so their values never reach a real token."""
     model, tokenizer = runtime.get_model(), runtime.get_tokenizer()
     out: list[str] = []
@@ -223,7 +223,7 @@ def generate_steered_batch(prompt_texts: list[str], hook: SteeringHook | None,
 
 
 # =========================================================================================
-# The READOUT — our measurement apparatus (notebook §1g).
+# The READOUT — our measurement apparatus.
 # =========================================================================================
 
 def target_token_id(s: str) -> int:
@@ -276,7 +276,7 @@ def readout_pdiff(spec: BehaviourSpec, item_texts: list[str], steer_hook=None, b
     is active during that pass and the steered direction really carries the behaviour, the model's
     own YES/NO judgment shifts — that shift is what NIE measures.
 
-    STEERING SCOPE (transcript, hard-coded — #56/#59): the hook is narrowed, per batch, to the
+    STEERING SCOPE (transcript, hard-coded): the hook is narrowed, per batch, to the
     transcript's own tokens — the few-shot demonstrations and the trailing question are NOT
     steered. See the module scope note for why this matters to the metric's validity.
     """
@@ -315,7 +315,7 @@ def nie_baseline_gap(spec: BehaviourSpec, pos_texts: list[str], neg_texts: list[
     in: with nothing manipulated, how much more YES does the readout give the true positives than
     the true negatives? NIE then says "steering moved the negatives X% of that natural class
     distance." Every NIE divides by the gap measured on ITS OWN texts — a control belongs to the
-    data it was measured on (§2f.i sweeps use train texts; §2f.iii/3f.iii evals use ID/OOD texts).
+    data it was measured on (sweeps use train texts; evals use ID/OOD texts).
     """
     pd_pos = readout_pdiff(spec, pos_texts)
     pd_neg = readout_pdiff(spec, neg_texts)
@@ -329,7 +329,7 @@ def nie_baseline_gap(spec: BehaviourSpec, pos_texts: list[str], neg_texts: list[
 
 
 # =========================================================================================
-# WHERE to steer — per-layer NIE sweep and block selection (notebook §1g / §2f.i).
+# WHERE to steer — per-layer NIE sweep and block selection.
 # =========================================================================================
 
 def nie_layer_sweep(spec, train_mean, labels, sweep_pos_texts, sweep_neg_texts, layers=None):
@@ -338,7 +338,7 @@ def nie_layer_sweep(spec, train_mean, labels, sweep_pos_texts, sweep_neg_texts, 
     single layer while the readout runs on the negative texts, and record how far the negatives'
     readout moved toward the positive class, in units of the baseline gap (= NIE)."""
     layers = layers or list(range(runtime.N_LAYERS))
-    # Control measurement on the sweep texts themselves (train split — see §2f.i note).
+    # Control measurement on the sweep texts themselves (train split).
     gap, base_neg = nie_baseline_gap(spec, sweep_pos_texts, sweep_neg_texts)
     nie = []
     for layer in tqdm(layers, desc=f"{spec.name} NIE sweep"):
@@ -362,12 +362,12 @@ def pick_block(nie, width=5):
 
 
 # =========================================================================================
-# WHAT to steer with — build and calibrate the exported direction set (notebook §1g / §2f.ii).
+# WHAT to steer with — build and calibrate the exported direction set.
 # =========================================================================================
 
 def build_directions(spec, block, train_mean, labels, train_texts, train_masks, max_length):
     """Return {method: {layer: raw (uncalibrated) direction}} for MM, LR, LR-attention — ALL
-    per-layer (decision (c), 2026-07-19: fully symmetric arms, CAA removed — plan #27).
+    per-layer: fully symmetric arms, CAA removed.
     MM/LR are refit from the pooled cache at each block layer. LR-attention requires full-sequence
     activations AT EACH BLOCK LAYER: extracted here RAM-only (use_cache=False; caching would cost
     ~len(block) x the train set on disk) and freed after training. 3 seeds per layer; the direction

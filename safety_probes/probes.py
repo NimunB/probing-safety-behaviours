@@ -1,9 +1,5 @@
 """The probe grid: MM (difference-of-means), LR (logistic regression), and the attention probe.
 
-Copied from notebook §1f. The only change from the notebook is that `SEED` is read from
-`runtime` instead of a notebook global — every signature, default, and line of math is
-unchanged, so the line-by-line audit against [GoT], [Apollo], and [HS] still holds.
-
 `ui_probe.py` depends on this module: `rebuild_detection_probe` constructs all three classes.
 """
 
@@ -113,21 +109,11 @@ class AttentionProbe(t.nn.Module):
 
 def train_attention_probe(acts, masks, labels, n_epochs=200, lr=5e-3, weight_decay=1e-3, seed=0,
                           desc=None, chunk_size=256):
-    """GPU-chunked full-batch training (plan #52a, 2026-07-30; previously CPU full-batch).
+    """GPU-chunked full-batch training (previously CPU full-batch).
 
-    Why: the old version converted the WHOLE fp16 activation tensor to fp32 on CPU every epoch —
-    memory-bound, so it crawled regardless of core count (~37 min/layer on the 128-core box).
-    Chunks now stream to the GPU when available.
-
-    THE MATH IS UNCHANGED: chunks accumulate gradients and the optimizer steps ONCE per epoch, so
-    the per-epoch gradient equals the old full-batch gradient (sum of chunk BCE sums / N) and the
-    AdamW trajectory is preserved up to device float-order. Init is seeded on the CPU RNG exactly
-    as before, so seed s still means the same initial probe. The trained probe is returned on CPU,
-    as before — every downstream consumer is unaffected. Falls back to CPU (still chunked) when
-    no GPU is present.
     """
     t.manual_seed(seed)
-    probe = AttentionProbe(d_model=acts.shape[-1])          # CPU init: same numbers as the audited runs
+    probe = AttentionProbe(d_model=acts.shape[-1])          # CPU init: same numbers as the recorded runs
     device = "cuda" if t.cuda.is_available() else "cpu"
     probe = probe.to(device)
     opt = t.optim.AdamW(probe.parameters(), lr=lr, weight_decay=weight_decay)

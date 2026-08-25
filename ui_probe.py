@@ -11,7 +11,7 @@ Gradio was the obvious choice and was rejected on evidence (2026-07-21). In this
   * gradio 5.x avoids that, but downgrades six packages including `starlette 1.3.1 -> 0.52.1`
     (a major version `fastapi 0.139.0` sits on top of), `pydantic_core`, `pillow`, `websockets`.
 
-This venv produced the audited thesis results; a UI is not worth destabilising it. `fastapi` and
+This venv produced the thesis results; a UI is not worth destabilising it. `fastapi` and
 `uvicorn` were already installed, so this app adds **zero dependencies**. It is also a simpler
 thing to put behind Caddy than Gradio's queue/websocket machinery.
 
@@ -116,7 +116,7 @@ def _text_and_mask(bundle: dict, messages: list[dict[str, str]]):
 
     Not a stylistic preference: `chat.py` is where the single-BOS guarantee and the mask policy
     live. Calling `apply_chat_template` directly here would reintroduce the double-BOS bug
-    (plan #22) and silently shift every activation by one token.
+    and silently shift every activation by one token.
     """
     if bundle["mask_policy"] == "assistant_only":
         return chat.chat_with_assistant_mask(messages)

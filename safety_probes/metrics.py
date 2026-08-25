@@ -1,4 +1,4 @@
-"""Probe training, scoring, and evaluation metrics (notebook §1f).
+"""Probe training, scoring, and evaluation metrics.
 
 Numeric only — every figure lives in `viz.py`, so this module imports no plotting library and
 can be used headlessly.
@@ -8,7 +8,7 @@ Metric choices, and why:
     estimate alone is not defensible. [HS Fig. 2] uses 3 seeds + 95% CI.
   * **TPR@1%FPR** — [HS Fig. 3b] comparability. Returns NaN rather than a misleading number on
     eval sets too small for 1% FPR to be reachable (see `tpr_at_fpr`).
-  * **Frozen-threshold accuracy: deliberately absent** (dropped 2026-07-19, plan #28) — it
+  * **Frozen-threshold accuracy: deliberately absent** — it
     measured threshold transfer between datasets, not representation quality.
 """
 
@@ -63,7 +63,7 @@ def tpr_at_fpr(labels, scores, target_fpr=0.01):
     Returns NaN when the set has too few negatives for target_fpr to correspond to >=1 tolerated
     false positive (n_neg < 1/target_fpr = 100 at 1%): 1% FPR is then UNREACHABLE and the metric
     would silently degrade to TPR@0FP. So AI Liar (27 neg) -> n/a; Roleplaying (371), the pool
-    (398), high-stakes -> computed. (plan #18c, resolved via the roleplaying OOD set, #35.)
+    (398), high-stakes -> computed. (resolved via the roleplaying OOD set.)
     """
     labels = np.asarray(labels)
     if int((labels == 0).sum()) < 1 / target_fpr:
@@ -120,7 +120,7 @@ def build_probe_grid(train_mean, train_last, train_masks_padded, train_acts_full
     print(f"  LR (mean) per-token training set: {Xtok.shape[0]} token-rows")
     grid["LR (mean)"] = (LRProbe.from_data(Xtok, ytok), "mean");          _done("LR (mean)")
     # Attention probe: 3 seeds, all kept for the CI.
-    # Slowest step, now GPU-chunked (#52a): same full-batch gradient, chunks streamed to the GPU.
+    # Slowest step, now GPU-chunked: same full-batch gradient, chunks streamed to the GPU.
     print("  LR-attention: 3 seeds x 200 epochs, GPU-chunked full-batch training (#52a)...")
     attn_probes = [train_attention_probe(train_acts_full, train_masks_padded, labels, seed=s,
                                          desc=f"    LR-attention seed {s + 1}/3")
@@ -148,7 +148,7 @@ def pack(mean, last, full, fmask, labels):
 
 
 def cat_pack(a, b):
-    """Concatenate two eval packs (used for the pooled deception OOD column, plan #35)."""
+    """Concatenate two eval packs (used for the pooled deception OOD column)."""
     return pack(t.cat([a["mean"], b["mean"]]), t.cat([a["last"], b["last"]]),
                 t.cat([a["full"], b["full"]]), t.cat([a["fmask"], b["fmask"]]),
                 t.cat([a["labels"], b["labels"]]))

@@ -1,7 +1,7 @@
-"""Steering dose-response evaluation — couples the readout, generation, and the judge (§1g cell 38).
+"""Steering evaluation — couples the readout, generation, and the judge.
 
 Its own module (not `steering.py`) so that the judge dependency stays out of the core steering
-code: the UI and the parity harness can apply steering without importing `anthropic`. This is the
+code: the UI can apply steering without importing `anthropic`. This is the
 one place that ties WRITE-side steering to the LLM judge.
 """
 
@@ -25,7 +25,7 @@ def steering_nie_llm_evaluation(spec, dirs, prompt_texts, readout_texts, pos_rea
                  for the behaviour AND coherence (the guard against "steering that works by breaking
                  the model"). No ANTHROPIC_API_KEY -> judge intentionally skipped, columns NaN,
                  NIE still fills. Passing `prompt_texts=[]` also skips the judge deliberately —
-                 for NIE-only eval sets (deception ID, plan #46). But when the judge IS configured
+                 for NIE-only eval sets (deception ID). But when the judge IS configured
                  and prompts were given it must not fail quietly: a point scored on fewer than the
                  requested generations prints a visible shortfall warning, and a point that scores
                  0/N raises (systematic breakage -> stop loudly, no empty panels).
@@ -39,7 +39,7 @@ def steering_nie_llm_evaluation(spec, dirs, prompt_texts, readout_texts, pos_rea
     def judged_generations(hook, label):
         if not prompt_texts or not judge_on:      # nothing to generate/judge (deliberate skips)
             return (np.nan, np.nan)
-        # (#52b) batch-generate on the GPU, then judge the batch with parallel API calls —
+        # Batch-generate on the GPU, then judge the batch with parallel API calls —
         # replaces the interleaved one-at-a-time loop (GPU idled during every judge round-trip).
         gens = generate_steered_batch(prompt_texts, hook)
         beh, coh = [], []
@@ -48,7 +48,7 @@ def steering_nie_llm_evaluation(spec, dirs, prompt_texts, readout_texts, pos_rea
                 if j:
                     beh.append(j["behaviour"]); coh.append(j["coherence"])
         n_ok, n_req = len(beh), len(prompt_texts)
-        if judge_on and n_req:  # only police failures when judging was actually requested (#46)
+        if judge_on and n_req:  # only police failures when judging was actually requested
             if n_ok == 0:
                 raise RuntimeError(
                     f"Judge scored 0/{n_req} generations at {label}: systematic failure (bad model/key/"

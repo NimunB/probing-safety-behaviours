@@ -1,10 +1,10 @@
-"""Verdict helpers + final-numbers persistence (originally notebook §4).
+"""Verdict helpers + final-numbers persistence.
 
-`auroc_pivot` and `nie_at` are the two §4 helpers, unchanged from the audited notebook. Since
-plan #45 (2026-07-30) the verdicts are computed inline in each behaviour notebook — a probing
+`auroc_pivot` and `nie_at` are the two verdict helpers. The verdicts are computed inline in each
+behaviour notebook — a probing
 verdict (best reader per eval set, LR-family win share) at the end of its probing section and a
-steering verdict (best writer by NIE at coef +1, MM win share) at the end of its steering section;
-`summary.ipynb` is gone. The save/load helpers persist each behaviour's final numbers (detection
+steering verdict (best writer by NIE at coef +1, MM win share) at the end of its steering section.
+The save/load helpers persist each behaviour's final numbers (detection
 AUROC frame, steering NIE-at-coef-1) as small CSVs in `exported_probes/` for thesis tables.
 """
 
@@ -59,8 +59,7 @@ def load_steering(behaviour: str) -> pd.DataFrame:
 
 def save_steering_full(results_by_evalset: dict[str, dict], behaviour: str) -> None:
     """Persist the COMPLETE dose-response results — every coef's NIE + judge behaviour/coherence,
-    per direction per eval set — for the cross-behaviour comparison notebook (plan #48), which runs
-    in its own kernel with no GPU. NaN (judge-skipped points, e.g. deception ID post-#46) survives
+    per direction per eval set. NaN (judge-skipped points, e.g. deception ID) survives
     the round-trip: Python's json emits/accepts the NaN literal."""
     import json
     payload = {label: {method: {k: [float(x) for x in v] for k, v in r.items()}

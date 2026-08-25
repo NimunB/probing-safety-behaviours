@@ -1,4 +1,4 @@
-"""Activation extraction and the disk cache (notebook §1b/§1c).
+"""Activation extraction and the disk cache.
 
 Two extractors, complementary in shape:
 
@@ -59,7 +59,7 @@ def cached(key: str, fn):
 def extract_pooled_all_layers(
     texts: list[str],
     det_masks: list[Bool[Tensor, " seq"]],
-    batch_size: int = 16,   # was 8 (sized for the 24 GB card); 16 fits the 32 GB card easily (#52c)
+    batch_size: int = 16,   # was 8 (sized for the 24 GB card); 16 fits the 32 GB card easily
     max_length: int = 512,
     desc: str = "extracting",
 ) -> tuple[Float[Tensor, "n layers d"], Float[Tensor, "n layers d"]]:
@@ -142,8 +142,8 @@ def extract_full_sequence_one_layer(name, texts, masks, layer, max_length=512, u
             # Keep the FULL token grid, but only at the one chosen layer: [b, max_length, d].
             acts.append(out.hidden_states[layer + 1].half().cpu())
             attn = inp["attention_mask"].bool().cpu()  # [b, max_length], True = real token
-            # Return the per-example DETECTION masks, not attention_mask (bug fixed 2026-07-10,
-            # plan #10: `masks` was accepted but ignored). These fmasks gate the attention probe's
+            # Return the per-example DETECTION masks, not attention_mask (bug fixed:
+            # `masks` was accepted but ignored). These fmasks gate the attention probe's
             # softmax — with attention_mask, the deception probe could attend to the system prompt,
             # which literally states the honest/deceptive persona (= the label). If truncation
             # removed every masked position, fall back to the last real token (an all-False row

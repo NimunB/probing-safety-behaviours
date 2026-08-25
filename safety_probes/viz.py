@@ -7,8 +7,7 @@ Kept out of `metrics.py`/`steering.py` so those stay headless (no plotly, no cir
 COMPLETES THE ARENA CUT. `process_str_tokens`, `visualize_token_scores`, and
 `score_tokens_with_probe` are vendored VERBATIM from ARENA's utils.py (only `utils.` prefixes and
 notebook globals rewritten). After this module, nothing in the project imports the course repo.
-`circuitsvis` is therefore a real dependency here (it was deferred while only the headless modules
-existed — plan M7); pin it in requirements before running on a fresh instance.
+`circuitsvis` is therefore a real dependency here)
 """
 
 from __future__ import annotations
@@ -66,7 +65,7 @@ def _use_style():
 
 
 # =========================================================================================
-# Report-figure auto-save (plan #59). Each notebook calls save_figures_to("<behaviour>") once;
+# Report-figure auto-save. Each notebook calls save_figures_to("<behaviour>") once;
 # matplotlib plot functions then take save="<slot>" and write research-report/figures/
 # <behaviour>/<slot>.png as a side effect of rendering, so every run refreshes the report's
 # images. EXCEPTION: plot_steering_effects is plotly (PNG export would need kaleido + a headless
@@ -263,7 +262,7 @@ def show_masked_tokens(text: str, mask: Bool[Tensor, " seq"], title: str):
 # =========================================================================================
 
 def plot_roc_curves(grid, ev, title, save=None):
-    """ROC curves for every probe on one eval pack ([NB] §5-style). Area under each curve = the
+    """ROC curves for every probe on one eval pack. Area under each curve = the
     AUROC table number. The LEFT EDGE is where TPR@1%FPR lives — a curve that hugs the y-axis
     catches positives before its first false alarms. matplotlib so it renders on GitHub."""
     _use_style()
@@ -300,7 +299,7 @@ def get_pca_components(acts: Tensor, k=2, return_var=False):
 
 def pca_and_projection_panel(mean_acts, labels, layer, direction, title, save=None):
     """Left: unsupervised PCA of the class geometry. Right: projection onto the (supervised) probe
-    direction — the axis the probe actually scores on. (Axis + shared-bin fixes: plan #42.)
+    direction — the axis the probe actually scores on.
     matplotlib so it renders on GitHub; the shared explicit bin grid is preserved so bar heights
     stay comparable across the two classes."""
     X = mean_acts[:, layer, :].float()
@@ -487,8 +486,7 @@ def show_token_heatmaps(texts, det_masks, labels, direction, layer, title, pos_n
     the dataset's GROUND-TRUTH class, not a prediction. Visualization only — the probe grid scores
     through probe.score, not this path.
 
-    `save_prefix` saves the FIRST shown example of each class as <prefix>_<class-slug>.png (plan
-    #59) — deterministic names for the report's paired figure, e.g. heatmap_deceptive/heatmap_honest
+    `save_prefix` saves the FIRST shown example of each class as <prefix>_<class-slug>.png — deterministic names for the report's paired figure, e.g. heatmap_deceptive/heatmap_honest
     (splits are seed-fixed, so "first of each class" is stable across runs)."""
     model, tokenizer = runtime.get_model(), runtime.get_tokenizer()
     special = set(tokenizer.all_special_ids)
@@ -523,11 +521,11 @@ def show_token_heatmaps(texts, det_masks, labels, direction, layer, title, pos_n
 
 def show_attention_heatmaps(full_acts, fmasks, texts, labels, probe_seeds, title, pos_name, neg_name,
                             n_show=2, save_prefix=None):
-    """WHERE the attention probe looks ([NB] §5; [HS Fig. 7] analogue): per-token softmax weights,
+    """WHERE the attention probe looks ([HS Fig. 7] analogue): per-token softmax weights,
     averaged over the 3 seeds. Weights are >= 0 and sum to 1 over unmasked positions, so intensity
     = share of attention; no centering. For high-stakes the fmask covers ALL real tokens — mass on
     BOS/template tokens is a finding (attention-sink parking), not a rendering bug.
-    `save_prefix`: first shown example per class -> <prefix>_<class-slug>.png (plan #59)."""
+    `save_prefix`: first shown example per class -> <prefix>_<class-slug>.png."""
     tokenizer = runtime.get_tokenizer()
     saved_classes = set()
     for i in range(n_show):
@@ -618,7 +616,7 @@ def plot_steering_effects(results, title):
          collapse is "steering by breaking the model", not a causal win. Read 2 and 3 together.
     Panels 2-3 are NaN without ANTHROPIC_API_KEY; panel 1 always fills.
 
-    NO save= HERE, deliberately (plan #59): this is the one remaining plotly figure, and plotly PNG
+    NO save= HERE, deliberately: this is the one remaining plotly figure, and plotly PNG
     export needs kaleido + a headless Chrome (~15 apt libs, wiped on recycle) — rejected 2026-08-05.
     The dose-response panels are manual screenshots -> research-report/figures/<behaviour>/
     steering_<eval>.png (slot names in figures/README.md)."""

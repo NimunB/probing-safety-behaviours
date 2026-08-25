@@ -1,22 +1,5 @@
 """Process-wide runtime state: the model, tokenizer, device, and derived config.
 
-WHY THIS MODULE EXISTS
-----------------------
-In `safety_probes.ipynb` everything is a notebook global — `model`, `tokenizer`, `device`,
-`SEED`, `MODEL_NAME`, `N_LAYERS`, `D_MODEL`, `section_dir`. Functions reference them freely
-because a notebook has exactly one namespace. Modules do not.
-
-Two ways to fix that:
-
-  (a) Thread `model` / `tokenizer` through every function signature. Cleanest in the abstract,
-      but it changes the signature of nearly every function in the pipeline — which makes a
-      line-by-line diff against the audited notebook much harder to read.
-
-  (b) Keep the signatures identical and hold shared state in one module that others read.
-
-We take (b) deliberately: this codebase has been line-by-line audited against the notebook and
-the papers, and preserving signatures keeps that audit valid. The cost is that `init()` must be
-called before anything else touches the model — the accessors raise a clear error if it isn't.
 
 USAGE
 -----
@@ -36,7 +19,7 @@ from pathlib import Path
 import numpy as np
 import torch as t
 
-# --- Configuration constants (were notebook globals in §1a) ------------------------------
+# --- Configuration constants ------------------------------
 MODEL_NAME = "meta-llama/Llama-3.1-8B-Instruct"
 SEED = 42
 
@@ -140,7 +123,7 @@ def init(
 ) -> None:
     """Load the model and tokenizer ONCE and seed the RNGs.
 
-    8-bit is what [NB] sections 4-5 use and what fits alongside cached activations on the GPU
+    8-bit is what fits alongside cached activations on the GPU
     box. Probes and steering operate on hidden states, which stay fp16 under 8-bit
     quantization, so quantization does not change the probing interface.
 
