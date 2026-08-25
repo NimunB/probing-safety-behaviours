@@ -1080,45 +1080,45 @@ study in its own right.
 
 \textbf{The sycophancy probes are not checked against an echo shortcut.}
 A sycophantic and a genuine agreement both echo the user, so a probe
-reading surface agreement could not separate them. This would require measuring each
-probe's AUROC on sycophantic against genuine agreements. Without this, the sycophancy AUROCs may partly measure the
+reading surface agreement cannot separate them. This would require measuring each
+probe's AUROC on sycophantic versus genuine agreements. Without this, the sycophancy AUROCs may partly measure the
 echo.
 
 \textbf{The judge is unvalidated.} Behaviour and coherence scores come from
 a single LLM judge (Claude Haiku 4.5) whose agreement with human raters was
 not measured.
 
-\textbf{No last-pooled direction is steered.} The steering grid contains
-mass-mean and logistic regression fit on mean-pooled activations and the
-attention direction, but not the last-pooled probes that detect sycophancy
-best. The sycophancy steering inversion may therefore partly reflect which
-directions were available rather than the estimators.
+\textbf{No last-token direction is steered.} We steer MM (mean), LR (mean)
+and LR-attention, but not the last-token probes --- even though MM (last) is
+the best sycophancy detector on both sets. The exclusion is deliberate
+(\S\ref{sec:steering}), but it means the sycophancy inversion may partly
+reflect which directions were available rather than the estimators themselves.
 
 \textbf{Both layer selections are anchored on mass-mean.} The detection
 layer is the argmax of the mass-mean probe's cross-validated AUROC, and the
-steering block is the window of maximum mass-mean NIE. Logistic regression
-and the attention probe are therefore evaluated at a layer and a block
-chosen for mass-mean, a mild bias toward it on both sides of the
+steering block is the window of maximum mass-mean NIE. The LR
+and LR-attention probes are therefore evaluated at a layer and block
+chosen for MM, a mild bias toward it on both sides of the
 comparison.
 
 \section{Future Work}
 
-\textbf{Steering in the other direction.} Everything here steers
-behaviour-off items toward the behaviour. The safety application runs the
-other way, suppressing a behaviour the model is exhibiting, and
-\citet{marks2024} find the two directions of the same intervention
-can diverge. Suppression needs its own evaluation, with behaviour-on items
-steered and the readout run in reverse.
+
+\textbf{Steering in the other direction.} Every item we steer is already
+behaviour-off, so the sweep measures induction only --- even at negative
+coefficients. The safety application runs the other way, suppressing a
+behaviour the model is exhibiting, and the two directions of the same
+intervention need not match: \citet{marks2024} measure them separately,
+each with its own denominator. Suppression needs its own evaluation, with
+behaviour-on items steered and the NIE denominator reversed.
 
 \textbf{Sparse autoencoders.} Replacing linear directions with
 sparse-autoencoder latents \citep{cunningham2023,bricken2023} would test
-whether a sparser basis separates the readable feature from the writable
-one, applying this pipeline's read/write comparison per latent rather than
-per direction.
+whether a sparser basis reads and writes better than a dense one.
 
 \textbf{Larger models.} Every gap to the reference papers was attributed
 to scale. Running the same pipeline on a 70B model, the size the reference papers
-work at, would test that directly and show whether the dissociation persists
+use, would test that directly and show whether our findings persist
 at scale.
 
 \textbf{Composing behaviours.} The interface already supports adding two behaviours'
