@@ -143,3 +143,17 @@ ssh -p <ssh-port> -L 8080:127.0.0.1:17860 <user>@<host>   # then open localhost:
 
 Because it shares `chat.py` and `export.py` with the pipeline, what the interface scores is what the
 notebooks scored.
+
+## 6. Versioning
+
+The write-ups of this work live in `report/`. Each paper folder is self-contained and builds with
+pdfLaTeX (`pdflatex <name>.tex`, run three times for cross-references):
+
+```
+submitted/        msc-submitted.tex + .pdf: the MSc dissertation exactly as submitted
+                  (the PDF is identical to the one at the repo root)
+arxiv-v1-upload/  arxiv-v1.tex + .pdf: the arXiv preprint, with comments stripped,
+                  co-authored with Massimo Poesio; zip everything except the PDF to upload
+shared/           scripts that regenerate the appendix tables and detection charts
+                  from exported_probes/; copy their output into a paper folder to use it
+```
