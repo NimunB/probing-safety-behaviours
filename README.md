@@ -8,7 +8,7 @@ regression) with three token-pooling schemes (last, mean, learned attention) ove
 direction twice: as a detector, and as a steering vector.
 
 
-**Dissertation (Arxiv):** [https://arxiv.org/abs/2610.30363](https://arxiv.org/abs/2610.30363)  
+**Dissertation (arXiv):** [https://arxiv.org/abs/2610.30363](https://arxiv.org/abs/2610.30363)  
 **10 minute talk:** [youtu.be/yvVOUxOzUlg](https://youtu.be/yvVOUxOzUlg)
 
 ---
