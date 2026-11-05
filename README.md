@@ -7,7 +7,8 @@ regression) with three token-pooling schemes (last, mean, learned attention) ove
 (deception, high-stakes awareness, sycophancy) on Llama-3.1-8B-Instruct, and evaluates every
 direction twice: as a detector, and as a steering vector.
 
-**Dissertation:** [Nimun_Bajwa_PG_Project_Dissertation.pdf](Nimun_Bajwa_PG_Project_Dissertation.pdf)  
+
+**Dissertation (Arxiv):** [https://arxiv.org/abs/2610.30363](https://arxiv.org/abs/2610.30363)  
 **10 minute talk:** [youtu.be/yvVOUxOzUlg](https://youtu.be/yvVOUxOzUlg)
 
 ---
